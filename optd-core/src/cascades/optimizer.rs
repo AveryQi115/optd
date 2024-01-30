@@ -222,6 +222,8 @@ impl<T: RelNodeTyp> CascadesOptimizer<T> {
     fn fire_optimize_tasks(&mut self, group_id: GroupId) -> Result<()> {
         self.tasks
             .push_back(Box::new(OptimizeGroupTask::new(group_id)));
+
+        // TODO: marker
         // get the task from the stack
         self.ctx.budget_used = false;
         let plan_space_begin = self.memo.compute_plan_space();

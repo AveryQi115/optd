@@ -109,6 +109,7 @@ impl<T: RelNodeTyp> Memo<T> {
         ExprId(id)
     }
 
+    // merge_group is for binding the same group
     fn merge_group(&mut self, group_a: ReducedGroupId, group_b: ReducedGroupId) -> ReducedGroupId {
         if group_a == group_b {
             return group_a;
@@ -122,6 +123,7 @@ impl<T: RelNodeTyp> Memo<T> {
         self.expr_id_to_group_id[&expr_id]
     }
 
+    // get_reduced_group_id is for getting the real group id by following the merged groups
     fn get_reduced_group_id(&self, mut group_id: GroupId) -> ReducedGroupId {
         while let Some(next_group_id) = self.merged_groups.get(&group_id) {
             group_id = *next_group_id;
@@ -146,11 +148,16 @@ impl<T: RelNodeTyp> Memo<T> {
         (group_id.as_group_id(), expr_id)
     }
 
+    // get expr_id by rel_node, get group_id by expr_id
+    // if one group contains multiple expr, multiple expr_id bind to the same group_id
+    // otherwise, one expr_id bind to one group_id
     pub fn get_expr_info(&self, rel_node: RelNodeRef<T>) -> (GroupId, ExprId) {
         let children_group_ids = rel_node
             .children
             .iter()
             .map(|child| {
+                // only Placeholder(groupId) can directly return group by type
+                // other types (sort, join, ...) cannot 
                 if let Some(group) = child.typ.extract_group() {
                     group
                 } else {
@@ -170,6 +177,8 @@ impl<T: RelNodeTyp> Memo<T> {
         return (group_id, expr_id);
     }
 
+    // infer current node's properties by its children's properties
+    // call the registered property builders and its derive function following the order
     fn infer_properties(
         &self,
         memo_node: RelMemoNode<T>,
@@ -221,6 +230,8 @@ impl<T: RelNodeTyp> Memo<T> {
         self.groups.insert(group_id, group);
     }
 
+    // RelNodeRef is different from RelMemoNode
+    // we create a new RelMemoNode and its expr_id, group_id here
     fn add_new_group_expr_inner(
         &mut self,
         rel_node: RelNodeRef<T>,
@@ -306,6 +317,8 @@ impl<T: RelNodeTyp> Memo<T> {
 
     /// Get all bindings of an expression.
     /// TODO: this is not efficient. Should decide whether to expand the rule based on the matcher.
+    /// 
+    /// level: the level of recursive children. level=2 get 2 levels of children node
     pub fn get_all_expr_bindings(
         &self,
         expr_id: ExprId,
