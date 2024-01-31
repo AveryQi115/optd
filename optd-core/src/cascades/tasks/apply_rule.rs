@@ -125,6 +125,15 @@ fn match_node<T: RelNodeTyp>(
     picks
 }
 
+fn match_and_pick_expr<T: RelNodeTyp>(
+    matcher: &RuleMatcher<T>,
+    expr_id: ExprId,
+    optimizer: &CascadesOptimizer<T>,
+) -> Vec<HashMap<usize, RelNode<T>>> {
+    let node = optimizer.get_expr_memoed(expr_id);
+    match_and_pick(matcher, node, optimizer)
+}
+
 fn match_and_pick_group<T: RelNodeTyp>(
     matcher: &RuleMatcher<T>,
     group_id: GroupId,
@@ -183,7 +192,7 @@ impl<T: RelNodeTyp> Task<T> for ApplyRuleTask {
         trace!(event = "task_begin", task = "apply_rule", expr_id = %self.expr_id, rule_id = %self.rule_id, rule = %rule.name());
         let group_id = optimizer.get_group_id(self.expr_id);
         let mut tasks = vec![];
-        let binding_exprs = match_and_pick_group(rule.matcher(), group_id, optimizer);
+        let binding_exprs = match_and_pick_expr(rule.matcher(), self.expr_id, optimizer);
         for expr in binding_exprs {
             let applied = rule.apply(optimizer, expr);
             for expr in applied {
