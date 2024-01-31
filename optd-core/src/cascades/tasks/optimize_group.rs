@@ -12,6 +12,12 @@ use crate::{
 
 use super::Task;
 
+/// OptimizeGroupTask traverses all expressions in the group 
+/// and adds OptimizeExpressionTask for logical rules, adds
+/// OptimizeInputsTask for physical rules.
+/// 
+/// If there is a winner in the group, returns without generating
+/// new task.
 pub struct OptimizeGroupTask {
     group_id: GroupId,
 }

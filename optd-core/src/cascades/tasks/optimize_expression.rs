@@ -12,6 +12,13 @@ use crate::{
 
 use super::Task;
 
+/// OptimizeExpressionTask traverses all rules for the expression
+/// if the rule matches, it adds ApplyRuleTask for the rule and the expr id
+/// and adds ExploreGroupTask for all input groups of the expression.
+/// 
+/// If the budget is reached, it stops the task and return
+/// If the mode is exploring, it skips the impl rules.
+/// If the rule is already fired for the same expr, it skips the rule.
 pub struct OptimizeExpressionTask {
     expr_id: ExprId,
     exploring: bool,

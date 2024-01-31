@@ -25,6 +25,8 @@ pub type RuleId = usize;
 #[derive(Default, Clone, Debug)]
 pub struct OptimizerContext {
     pub upper_bound: Option<f64>,
+    /// once budget_used is set to true, we stop applying logical rules.
+    /// It is set to true when partial_explore_iter or space is reached.
     pub budget_used: bool,
     pub rules_applied: usize,
 }
@@ -219,11 +221,14 @@ impl<T: RelNodeTyp> CascadesOptimizer<T> {
             .get_best_group_binding(group_id, &mut on_produce)?)
     }
 
+    // push OptimizeGroupTask of the group id to the back of the task deque
+    // pop back the task from self.task and execute it.
+    // extend new task if the fired tasks generate new tasks.
+    // continue this step until the task stack is empty or boundary is reached.
     fn fire_optimize_tasks(&mut self, group_id: GroupId) -> Result<()> {
         self.tasks
             .push_back(Box::new(OptimizeGroupTask::new(group_id)));
 
-        // TODO: marker
         // get the task from the stack
         self.ctx.budget_used = false;
         let plan_space_begin = self.memo.compute_plan_space();
