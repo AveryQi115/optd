@@ -36,7 +36,7 @@ use crate::{physical_collector::CollectorExec, OptdPlanContext};
 // TODO: current DataType and ConstantType are not 1 to 1 mapping
 // optd schema stores constantType from data type in catalog.get
 // for decimal128, the precision is lost
-fn from_optd_schema(optd_schema: &OptdSchema) -> Schema {
+fn from_optd_schema(optd_schema: OptdSchema) -> Schema {
     let match_type = |typ: &ConstantType| match typ {
         ConstantType::Any => unimplemented!(),
         ConstantType::Bool => DataType::Boolean,
@@ -52,12 +52,15 @@ fn from_optd_schema(optd_schema: &OptdSchema) -> Schema {
         ConstantType::Decimal => DataType::Float64,
         ConstantType::Utf8String => DataType::Utf8,
     };
-    let fields: Vec<_> = optd_schema
-        .0
-        .iter()
-        .enumerate()
-        .map(|(i, typ)| Field::new(format!("c{}", i), match_type(typ), false))
-        .collect();
+    let mut fields = vec![];
+    fields.reserve(optd_schema.len());
+    for field in optd_schema.fields {
+        fields.push(Field::new(
+            field.name,
+            match_type(&field.typ),
+            field.nullable,
+        ));
+    }
     Schema::new(fields)
 }
 
@@ -351,7 +354,8 @@ impl OptdPlanContext<'_> {
             Schema::new_with_metadata(fields, HashMap::new())
         };
 
-        let physical_expr = Self::conv_from_optd_expr(node.cond(), &Arc::new(filter_schema.clone()))?;
+        let physical_expr =
+            Self::conv_from_optd_expr(node.cond(), &Arc::new(filter_schema.clone()))?;
 
         if let JoinType::Cross = node.join_type() {
             return Ok(Arc::new(CrossJoinExec::new(left_exec, right_exec))
@@ -436,7 +440,7 @@ impl OptdPlanContext<'_> {
 
     #[async_recursion]
     async fn conv_from_optd_plan_node(&mut self, node: PlanNode) -> Result<Arc<dyn ExecutionPlan>> {
-        let mut schema = OptdSchema(vec![]);
+        let mut schema = OptdSchema { fields: vec![] };
         if node.typ() == OptRelNodeTyp::PhysicalEmptyRelation {
             schema = node.schema(self.optimizer.unwrap().optd_optimizer());
         }
@@ -484,7 +488,7 @@ impl OptdPlanContext<'_> {
             }
             OptRelNodeTyp::PhysicalEmptyRelation => {
                 let physical_node = PhysicalEmptyRelation::from_rel_node(rel_node).unwrap();
-                let datafusion_schema: Schema = from_optd_schema(&schema);
+                let datafusion_schema: Schema = from_optd_schema(schema);
                 Ok(Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
                     physical_node.produce_one_row(),
                     Arc::new(datafusion_schema),
@@ -495,7 +499,10 @@ impl OptdPlanContext<'_> {
         result.with_context(|| format!("when processing {}", rel_node_dbg))
     }
 
-    pub async fn conv_from_optd(&mut self, root_rel: OptRelNodeRef) -> Result<Arc<dyn ExecutionPlan>> {
+    pub async fn conv_from_optd(
+        &mut self,
+        root_rel: OptRelNodeRef,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
         self.conv_from_optd_plan_node(PlanNode::from_rel_node(root_rel).unwrap())
             .await
     }
