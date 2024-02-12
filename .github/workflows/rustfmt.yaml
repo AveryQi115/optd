@@ -3,16 +3,10 @@ on: pull_request
 name: Rustfmt
 
 jobs:
-  format:
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: rustfmt
-      - uses: mbrobbel/rustfmt-check@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          mode: review
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check formatting
+        run: cargo fmt --all --check
