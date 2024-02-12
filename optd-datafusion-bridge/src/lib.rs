@@ -63,8 +63,7 @@ impl Catalog for DatafusionCatalog {
         let table = futures_lite::future::block_on(schema.table(name.as_ref())).unwrap();
         let schema = table.schema();
         let fields = schema.fields();
-        let mut optd_fields = vec![];
-        optd_fields.reserve(fields.len());
+        let mut optd_fields = Vec::with_capacity(fields.len());
         for field in fields {
             let dt = match field.data_type() {
                 DataType::Date32 => ConstantType::Date,

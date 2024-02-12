@@ -52,8 +52,7 @@ fn from_optd_schema(optd_schema: OptdSchema) -> Schema {
         ConstantType::Decimal => DataType::Float64,
         ConstantType::Utf8String => DataType::Utf8,
     };
-    let mut fields = vec![];
-    fields.reserve(optd_schema.len());
+    let mut fields = Vec::with_capacity(optd_schema.len());
     for field in optd_schema.fields {
         fields.push(Field::new(
             field.name,
