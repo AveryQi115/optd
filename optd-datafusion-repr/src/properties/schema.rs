@@ -61,7 +61,7 @@ impl PropertyBuilder<OptRelNodeTyp> for SchemaPropertyBuilder {
             }
             OptRelNodeTyp::List => {
                 // TODO: calculate real is_nullable for aggregations
-                let schema = Schema {
+                Schema {
                     fields: vec![
                         Field {
                             name: "unnamed".to_string(),
@@ -70,8 +70,7 @@ impl PropertyBuilder<OptRelNodeTyp> for SchemaPropertyBuilder {
                         };
                         children.len()
                     ],
-                };
-                schema
+                }
             }
             _ => Schema { fields: vec![] },
         }
