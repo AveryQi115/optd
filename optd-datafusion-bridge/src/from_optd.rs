@@ -351,7 +351,8 @@ impl OptdPlanContext<'_> {
             Schema::new_with_metadata(fields, HashMap::new())
         };
 
-        let physical_expr = Self::conv_from_optd_expr(node.cond(), &Arc::new(filter_schema.clone()))?;
+        let physical_expr =
+            Self::conv_from_optd_expr(node.cond(), &Arc::new(filter_schema.clone()))?;
 
         if let JoinType::Cross = node.join_type() {
             return Ok(Arc::new(CrossJoinExec::new(left_exec, right_exec))
@@ -495,7 +496,10 @@ impl OptdPlanContext<'_> {
         result.with_context(|| format!("when processing {}", rel_node_dbg))
     }
 
-    pub async fn conv_from_optd(&mut self, root_rel: OptRelNodeRef) -> Result<Arc<dyn ExecutionPlan>> {
+    pub async fn conv_from_optd(
+        &mut self,
+        root_rel: OptRelNodeRef,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
         self.conv_from_optd_plan_node(PlanNode::from_rel_node(root_rel).unwrap())
             .await
     }
