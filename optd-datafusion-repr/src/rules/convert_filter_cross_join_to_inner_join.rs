@@ -8,9 +8,6 @@ use optd_core::optimizer::Optimizer;
 use optd_core::rel_node::RelNode;
 use optd_core::rules::{Rule, RuleMatcher};
 
-#[allow(unused_imports)]
-use super::macros::{define_rule};
-
 use crate::plan_nodes::LogOpExpr;
 use crate::plan_nodes::OptRelNodeRef;
 #[allow(unused_imports)]
@@ -46,29 +43,133 @@ impl Error for MyError {
     }
 }
 
-define_rule!(
-    ConvertFilterCrossJoinToInnerJoinRule,
-    convert_filter_cross_join_to_inner_join,
-    (Filter, child, [cond])
-);
+pub struct ConvertFilterCrossJoinToInnerJoinRule {
+    matcher: RuleMatcher<OptRelNodeTyp>,
+}
 
-fn try_flatten_join_inputs(
+const JOIN_LEFT_CHILD: usize = 0;
+const JOIN_RIGHT_CHILD: usize = 1;
+const FILTER_COND: usize = 2;
+const JOIN_COND: usize = 3;
+
+impl ConvertFilterCrossJoinToInnerJoinRule {
+    pub fn new() -> Self {
+        Self {
+            matcher: RuleMatcher::MatchNode {
+                typ: OptRelNodeTyp::Filter,
+                children: vec![
+                    RuleMatcher::MatchNode {
+                        typ: OptRelNodeTyp::Join(JoinType::Cross),
+                        children: vec![
+                            RuleMatcher::PickOne {
+                                pick_to: JOIN_LEFT_CHILD,
+                                expand: false,
+                            },
+                            RuleMatcher::PickOne {
+                                pick_to: JOIN_RIGHT_CHILD,
+                                expand: false,
+                            },
+                            RuleMatcher::PickOne {
+                                pick_to: JOIN_COND,
+                                expand: true,
+                            },
+                        ],
+                    },
+                    RuleMatcher::PickOne {
+                        pick_to: FILTER_COND,
+                        expand: true,
+                    },
+                ]
+            },
+        }
+    }
+}
+
+impl<O> Rule<OptRelNodeTyp, O> for ConvertFilterCrossJoinToInnerJoinRule 
+where 
+    O: Optimizer<OptRelNodeTyp>
+{
+    fn matcher(&self) -> &RuleMatcher<OptRelNodeTyp> {
+        &self.matcher
+    }
+
+    fn apply(
+        &self,
+        optimizer: &O,
+        mut input: HashMap<usize, RelNode<OptRelNodeTyp>>,
+    ) -> Vec<RelNode<OptRelNodeTyp>> {
+        let left_child = input.remove(&JOIN_LEFT_CHILD).unwrap();
+        let right_child = input.remove(&JOIN_RIGHT_CHILD).unwrap();
+        let filter_cond = input.remove(&FILTER_COND).unwrap();
+
+        let mut possible_join_keys:HashSet<(OptRelNodeRef,OptRelNodeRef)> = HashSet::new();
+        let mut all_inputs = vec![];
+        
+        flatten_join_inputs(&left_child, optimizer, &mut possible_join_keys, &mut all_inputs);
+        flatten_join_inputs(&right_child, optimizer, &mut possible_join_keys, &mut all_inputs);
+
+        return vec![];
+        // let _parent_predicate = match child.typ {
+        //     OptRelNodeTyp::Join(JoinType::Inner) | OptRelNodeTyp::Join(JoinType::Cross) => {
+        //         if let Ok(false) | Err(_) = try_flatten_join_inputs(
+        //             &child,
+        //             &mut possible_join_keys,
+        //             &mut all_inputs,
+        //         ){
+        //             return vec![];
+        //         };
+
+        //         let expr = Expr::from_rel_node(Arc::new(cond)).unwrap();
+        //         extract_possible_join_keys(
+        //             &expr,
+        //             &mut possible_join_keys,
+        //         );
+        //         Some(expr)
+        //     }
+        //     _ => {
+        //         return vec![];
+        //     }
+        // };
+
+        // return vec![];
+    }
+
+    fn name(&self) -> &'static str {
+        "convert_filter_cross_join_to_inner_join"
+    }
+}
+
+/// flatten_join_inputs flatten recursive joins and collects inputs to all_inputs,
+///     equal condition join keys to possible_join_keys.
+/// When it meets a non equal condition join keys , for example, a < b, or other 
+///     join types(semi, outer,...), it will return false, meaning that inputs 
+///     cannot be flattened, otherwise the filter condition will be lost.
+/// eg: select * from t1 join t2 on t1.a = t2.a, t3 where t2.b = t3.b will be flattened
+///     and t1.a = t2.a will be collected to possible join keys, t1, t2, t3 will be
+///     collected to all_inputs.
+fn flatten_join_inputs<O: Optimizer<OptRelNodeTyp>>(
     input_node: &RelNode<OptRelNodeTyp>,
+    _optimizer: &O,
     possible_join_keys: &mut HashSet<(OptRelNodeRef, OptRelNodeRef)>,
     all_inputs: &mut Vec<OptRelNodeRef>,
-) -> Result<bool, MyError> {
-    let join = LogicalJoin::from_rel_node(Arc::new(input_node.clone())).unwrap();
+) -> bool {
+
+    let join = match input_node.typ{
+        OptRelNodeTyp::Join(_) => {
+            LogicalJoin::from_rel_node(Arc::new(input_node.clone())).unwrap()
+        }
+        OptRelNodeTyp::Placeholder(_group_id) => {
+            return false;
+        }
+        _ => {
+            return false;
+        }
+    };
 
     let children = match join.join_type() {
         JoinType::Inner => {
-            // TODO: Currently optd only supports equal condition as join condition for inner join
-            // eg: select * from t join s on t.a = s.a
-            // queries like `select * from t join s on t.a between s.min and s.max` are not supported
-            // if we adds support for non equal conditions filter in join condition, this rule should
-            //  be skipped when non equal conditions(filters) are present in join condition, otherwise
-            //  those filters will be ignored to generate wrong results
             if !extract_possible_join_keys(&join.cond(), possible_join_keys){
-                return Ok(false); // return false if joind cond has non equal conditions
+                return false;
             }
             vec![join.left().clone(), join.right().clone()]
         }
@@ -78,7 +179,7 @@ fn try_flatten_join_inputs(
             vec![left, right]
         }
         _ => {
-            return Err(MyError::new("try_flatten_join_inputs can only be called on cross join and inner join".into()));
+            return false;
         }
     };
 
@@ -86,9 +187,12 @@ fn try_flatten_join_inputs(
         match child.typ() {
             OptRelNodeTyp::Join(JoinType::Inner) | OptRelNodeTyp::Join(JoinType::Cross) => {
                 let child_ref = child.into_rel_node();
-                if !try_flatten_join_inputs(&child_ref, possible_join_keys, all_inputs)? {
-                    return Ok(false);
+                if !flatten_join_inputs(&child_ref, _optimizer, possible_join_keys, all_inputs) {
+                    return false;
                 }
+            }
+            OptRelNodeTyp::Placeholder(_group_id) => {
+                return false;
             }
             _ => {
                 let child_ref = child.into_rel_node();
@@ -96,7 +200,7 @@ fn try_flatten_join_inputs(
             }
         }
     }
-    Ok(true)
+    true
 }
 
 fn intersect(
@@ -208,74 +312,3 @@ fn extract_possible_join_keys(expr: &Expr, possible_join_keys: &mut HashSet<(Opt
 //         join_type: JoinType::Cross,
 //     });
 // }
-
-fn convert_filter_cross_join_to_inner_join(
-    _optimizer: &impl Optimizer<OptRelNodeTyp>,
-    ConvertFilterCrossJoinToInnerJoinRulePicks { child, cond }: ConvertFilterCrossJoinToInnerJoinRulePicks,
-) -> Vec<RelNode<OptRelNodeTyp>>{
-    let mut possible_join_keys:HashSet<(OptRelNodeRef,OptRelNodeRef)> = HashSet::new();
-    let mut all_inputs = vec![];
-    print!("\n\nchild:");
-    print!("{}\n\n", child.to_string());
-    let _parent_predicate = match child.typ {
-        OptRelNodeTyp::Join(JoinType::Inner) | OptRelNodeTyp::Join(JoinType::Cross) => {
-            if let Ok(false) | Err(_) = try_flatten_join_inputs(
-                &child,
-                &mut possible_join_keys,
-                &mut all_inputs,
-            ){
-                return vec![];
-            };
-
-            let expr = Expr::from_rel_node(Arc::new(cond)).unwrap();
-            extract_possible_join_keys(
-                &expr,
-                &mut possible_join_keys,
-            );
-            Some(expr)
-        }
-        _ => {
-            return vec![];
-        }
-    };
-
-    return vec![];
-
-    // let mut all_join_keys = HashSet::<(Expr, Expr)>::new();
-    // let mut left = all_inputs.remove(0);
-    // while !all_inputs.is_empty() {
-    //     left = find_inner_join(
-    //         &left,
-    //         &mut all_inputs,
-    //         &mut possible_join_keys,
-    //         &mut all_join_keys,
-    //     )?;
-    // }
-
-    // left = utils::optimize_children(self, &left, config)?.unwrap_or(left);
-
-    // if plan.schema() != left.schema() {
-    //     left = LogicalPlan::Projection(Projection::new_from_schema(
-    //         Arc::new(left),
-    //         plan.schema().clone(),
-    //     ));
-    // }
-
-    // let Some(predicate) = parent_predicate else {
-    //     return Ok(Some(left));
-    // };
-
-    // // If there are no join keys then do nothing:
-    // if all_join_keys.is_empty() {
-    //     Filter::try_new(predicate.clone(), Arc::new(left))
-    //         .map(|f| Some(LogicalPlan::Filter(f)))
-    // } else {
-    //     // Remove join expressions from filter:
-    //     match remove_join_expressions(predicate, &all_join_keys)? {
-    //         Some(filter_expr) => Filter::try_new(filter_expr, Arc::new(left))
-    //             .map(|f| Some(LogicalPlan::Filter(f))),
-    //         _ => Ok(Some(left)),
-    //     }
-    // }
-
-}
