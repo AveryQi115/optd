@@ -1,4 +1,5 @@
 // mod filter_join;
+mod convert_filter_cross_join_to_inner_join;
 mod eliminate_duplicated_expr;
 mod eliminate_filter;
 mod eliminate_limit;
@@ -12,6 +13,7 @@ pub use eliminate_duplicated_expr::{
 };
 pub use eliminate_filter::EliminateFilterRule;
 pub use eliminate_limit::EliminateLimitRule;
+pub use convert_filter_cross_join_to_inner_join::ConvertFilterCrossJoinToInnerJoinRule;
 pub use joins::{
     EliminateJoinRule, HashJoinRule, JoinAssocRule, JoinCommuteRule, ProjectionPullUpJoin,
 };

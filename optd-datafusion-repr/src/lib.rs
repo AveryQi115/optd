@@ -14,9 +14,7 @@ use properties::{
     schema::{Catalog, SchemaPropertyBuilder},
 };
 use rules::{
-    EliminateDuplicatedAggExprRule, EliminateDuplicatedSortExprRule, EliminateFilterRule,
-    EliminateJoinRule, EliminateLimitRule, HashJoinRule, JoinAssocRule, JoinCommuteRule,
-    PhysicalConversionRule, ProjectionPullUpJoin,
+    ConvertFilterCrossJoinToInnerJoinRule, EliminateDuplicatedAggExprRule, EliminateDuplicatedSortExprRule, EliminateFilterRule, EliminateJoinRule, EliminateLimitRule, HashJoinRule, JoinAssocRule, JoinCommuteRule, PhysicalConversionRule, ProjectionPullUpJoin
 };
 
 pub use adaptive::PhysicalCollector;
@@ -58,6 +56,8 @@ impl DatafusionOptimizer {
         rules.push(Arc::new(EliminateLimitRule::new()));
         rules.push(Arc::new(EliminateDuplicatedSortExprRule::new()));
         rules.push(Arc::new(EliminateDuplicatedAggExprRule::new()));
+        rules.push(Arc::new(ConvertFilterCrossJoinToInnerJoinRule::new()));
+
         rules
     }
 
