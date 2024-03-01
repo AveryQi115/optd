@@ -140,10 +140,6 @@ impl<O: Optimizer<OptRelNodeTyp>> Rule<OptRelNodeTyp, O> for PhysicalConversionR
         }
     }
 
-    fn is_impl_rule(&self) -> bool {
-        true
-    }
-
     fn get_rule_type(&self) -> RuleType {
         RuleType::Implementation
     }
