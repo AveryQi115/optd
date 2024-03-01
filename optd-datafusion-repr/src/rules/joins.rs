@@ -115,7 +115,11 @@ fn apply_eliminate_join(
             }
         }
     }
-    vec![]
+    vec![RelNode {
+        typ: OptRelNodeTyp::Join(JoinType::Inner),
+        children: vec![left.into(), right.into(), cond.into()],
+        data: None,
+    }]
 }
 
 // (A join B) join C -> A join (B join C)

@@ -216,7 +216,7 @@ impl OptdQueryPlanner {
                 optimizer_name: "datafusion".to_string(),
             }));
         }
-        let optd_rel = ctx.conv_into_optd(logical_plan)?;
+        let mut optd_rel = ctx.conv_into_optd(logical_plan)?;
         if let Some(explains) = &mut explains {
             explains.push(StringifiedPlan::new(
                 PlanType::OptimizedLogicalPlan {
@@ -228,7 +228,12 @@ impl OptdQueryPlanner {
             ));
         }
         let mut optimizer = self.optimizer.lock().unwrap().take().unwrap();
+        if optimizer.is_heuristic_enabled(){
+            optd_rel = optimizer.heuristic_optimize(optd_rel)?;
+        }
+        println!("{}", optd_rel.to_string());
         let (group_id, optimized_rel) = optimizer.optimize(optd_rel)?;
+        println!("{}", optimized_rel.to_string());
         if let Some(explains) = &mut explains {
             explains.push(StringifiedPlan::new(
                 PlanType::OptimizedPhysicalPlan {
@@ -250,7 +255,7 @@ impl OptdQueryPlanner {
                 },
             ));
             let bindings = optimizer
-                .optd_optimizer()
+                .optd_cascades_optimizer()
                 .get_all_group_bindings(group_id, true);
             let mut join_orders = BTreeSet::new();
             let mut logical_join_orders = BTreeSet::new();

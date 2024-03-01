@@ -523,7 +523,7 @@ impl OptdPlanContext<'_> {
     async fn conv_from_optd_plan_node(&mut self, node: PlanNode) -> Result<Arc<dyn ExecutionPlan>> {
         let mut schema = OptdSchema { fields: vec![] };
         if node.typ() == OptRelNodeTyp::PhysicalEmptyRelation {
-            schema = node.schema(self.optimizer.unwrap().optd_optimizer());
+            schema = node.schema(self.optimizer.unwrap().optd_cascades_optimizer());
         }
         let rel_node = node.into_rel_node();
         let rel_node_dbg = rel_node.clone();

@@ -5,7 +5,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use cost::{AdaptiveCostModel, RuntimeAdaptionStorage};
 use optd_core::{
+    optimizer::Optimizer,
     cascades::{CascadesOptimizer, GroupId, OptimizerProperties},
+    heuristics::{ApplyOrder, HeuristicsOptimizer},
     rules::Rule,
 };
 use plan_nodes::{OptRelNode, OptRelNodeRef, OptRelNodeTyp, PlanNode};
@@ -27,9 +29,11 @@ pub mod properties;
 pub mod rules;
 
 pub struct DatafusionOptimizer {
+    hueristic_optimizer: HeuristicsOptimizer<OptRelNodeTyp>,
     optimizer: CascadesOptimizer<OptRelNodeTyp>,
     pub runtime_statistics: RuntimeAdaptionStorage,
     enable_adaptive: bool,
+    enable_heuristic: bool,
 }
 
 impl DatafusionOptimizer {
@@ -37,15 +41,35 @@ impl DatafusionOptimizer {
         self.enable_adaptive = enable;
     }
 
-    pub fn optd_optimizer(&self) -> &CascadesOptimizer<OptRelNodeTyp> {
+    pub fn enable_heuristic(&mut self, enable: bool) {
+        self.enable_heuristic = enable;
+    }
+
+    pub fn is_heuristic_enabled(&self) -> bool {
+        self.enable_heuristic
+    }
+
+    pub fn optd_cascades_optimizer(&self) -> &CascadesOptimizer<OptRelNodeTyp> {
         &self.optimizer
+    }
+
+    pub fn optd_hueristic_optimizer(&self) -> &HeuristicsOptimizer<OptRelNodeTyp> {
+        &self.hueristic_optimizer
     }
 
     pub fn optd_optimizer_mut(&mut self) -> &mut CascadesOptimizer<OptRelNodeTyp> {
         &mut self.optimizer
     }
 
-    pub fn default_rules() -> Vec<Arc<dyn Rule<OptRelNodeTyp, CascadesOptimizer<OptRelNodeTyp>>>> {
+    pub fn default_heuristic_rules() -> Vec<Arc<dyn Rule<OptRelNodeTyp, HeuristicsOptimizer<OptRelNodeTyp>>>> {
+        let mut rules: Vec<Arc<dyn Rule<OptRelNodeTyp, HeuristicsOptimizer<OptRelNodeTyp>>>> = vec![];
+        rules.push(Arc::new(EliminateJoinRule::new()));
+        // rules.push(Arc::new(ConvertFilterCrossJoinToInnerJoinRule::new()));
+
+        rules
+    }
+
+    pub fn default_cascades_rules() -> Vec<Arc<dyn Rule<OptRelNodeTyp, CascadesOptimizer<OptRelNodeTyp>>>> {
         let mut rules = PhysicalConversionRule::all_conversions();
         rules.push(Arc::new(HashJoinRule::new()));
         rules.push(Arc::new(JoinCommuteRule::new()));
@@ -56,19 +80,20 @@ impl DatafusionOptimizer {
         rules.push(Arc::new(EliminateLimitRule::new()));
         rules.push(Arc::new(EliminateDuplicatedSortExprRule::new()));
         rules.push(Arc::new(EliminateDuplicatedAggExprRule::new()));
-        rules.push(Arc::new(ConvertFilterCrossJoinToInnerJoinRule::new()));
 
         rules
     }
 
     /// Create an optimizer for testing purpose: adaptive disabled + partial explore (otherwise it's too slow).
     pub fn new_physical(catalog: Arc<dyn Catalog>) -> Self {
-        let rules = Self::default_rules();
+        let cascades_rules = Self::default_cascades_rules();
+        let heuristic_rules = Self::default_heuristic_rules();
+
         let cost_model = AdaptiveCostModel::new(50);
         Self {
             runtime_statistics: cost_model.get_runtime_map(),
             optimizer: CascadesOptimizer::new_with_prop(
-                rules,
+                cascades_rules,
                 Box::new(cost_model),
                 vec![
                     Box::new(SchemaPropertyBuilder::new(catalog.clone())),
@@ -79,18 +104,21 @@ impl DatafusionOptimizer {
                     partial_explore_space: Some(1 << 10),
                 },
             ),
+            hueristic_optimizer: HeuristicsOptimizer::new_with_rules(heuristic_rules, ApplyOrder::BottomUp),
             enable_adaptive: false,
+            enable_heuristic: true,
         }
     }
 
     /// Create an optimizer with default settings: adaptive + partial explore.
     pub fn new_physical_adaptive(catalog: Arc<dyn Catalog>) -> Self {
-        let rules = Self::default_rules();
+        let cascades_rules = Self::default_cascades_rules();
+        let heuristic_rules = Self::default_heuristic_rules();
         let cost_model = AdaptiveCostModel::new(50);
         Self {
             runtime_statistics: cost_model.get_runtime_map(),
             optimizer: CascadesOptimizer::new_with_prop(
-                rules,
+                cascades_rules,
                 Box::new(cost_model),
                 vec![
                     Box::new(SchemaPropertyBuilder::new(catalog.clone())),
@@ -101,34 +129,44 @@ impl DatafusionOptimizer {
                     partial_explore_space: Some(1 << 10),
                 },
             ),
+            hueristic_optimizer: HeuristicsOptimizer::new_with_rules(heuristic_rules, ApplyOrder::BottomUp),
             enable_adaptive: true,
+            enable_heuristic: true,
         }
     }
 
     /// The optimizer settings for three-join demo as a perfect optimizer.
     pub fn new_alternative_physical_for_demo(catalog: Arc<dyn Catalog>) -> Self {
-        let mut rules = PhysicalConversionRule::all_conversions();
-        rules.push(Arc::new(HashJoinRule::new()));
-        rules.insert(0, Arc::new(JoinCommuteRule::new()));
-        rules.insert(1, Arc::new(JoinAssocRule::new()));
-        rules.insert(2, Arc::new(ProjectionPullUpJoin::new()));
-        rules.insert(3, Arc::new(EliminateFilterRule::new()));
+        let mut cascades_rules = PhysicalConversionRule::all_conversions();
+        cascades_rules.push(Arc::new(HashJoinRule::new()));
+        cascades_rules.insert(0, Arc::new(JoinCommuteRule::new()));
+        cascades_rules.insert(1, Arc::new(JoinAssocRule::new()));
+        cascades_rules.insert(2, Arc::new(ProjectionPullUpJoin::new()));
+        cascades_rules.insert(3, Arc::new(EliminateFilterRule::new()));
 
         let cost_model = AdaptiveCostModel::new(1000); // very large decay
         let runtime_statistics = cost_model.get_runtime_map();
-        let optimizer = CascadesOptimizer::new(
-            rules,
+        let cascades_optimizer = CascadesOptimizer::new(
+            cascades_rules,
             Box::new(cost_model),
             vec![
                 Box::new(SchemaPropertyBuilder::new(catalog.clone())),
                 Box::new(ColumnRefPropertyBuilder::new(catalog)),
             ],
         );
+        let heuristics_rules = Self::default_heuristic_rules();
+        let heuristic_optimizer = HeuristicsOptimizer::new_with_rules(heuristics_rules, ApplyOrder::BottomUp);
         Self {
-            runtime_statistics,
-            optimizer,
+            hueristic_optimizer: heuristic_optimizer,
+            runtime_statistics: runtime_statistics,
+            optimizer: cascades_optimizer,
             enable_adaptive: true,
+            enable_heuristic: true,
         }
+    }
+
+    pub fn heuristic_optimize(&mut self, root_rel: OptRelNodeRef) -> Result<OptRelNodeRef> {
+        self.hueristic_optimizer.optimize(root_rel)
     }
 
     pub fn optimize(&mut self, root_rel: OptRelNodeRef) -> Result<(GroupId, OptRelNodeRef)> {

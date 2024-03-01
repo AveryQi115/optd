@@ -8,40 +8,14 @@ use optd_core::optimizer::Optimizer;
 use optd_core::rel_node::RelNode;
 use optd_core::rules::{Rule, RuleMatcher};
 
-use crate::plan_nodes::LogOpExpr;
 use crate::plan_nodes::OptRelNodeRef;
 #[allow(unused_imports)]
 use crate::plan_nodes::{
-    BinOpExpr, BinOpType, ColumnRefExpr, ConstantExpr, ConstantType, Expr, ExprList, JoinType, LogOpType, LogicalJoin, LogicalProjection, OptRelNode, OptRelNodeTyp, PlanNode
+    BinOpExpr, BinOpType, ColumnRefExpr, ConstantExpr, ConstantType, Expr, ExprList, JoinType, LogicalJoin, LogicalProjection, OptRelNode, OptRelNodeTyp, PlanNode
 };
 
 #[allow(unused_imports)]
 use crate::properties::schema::SchemaPropertyBuilder;
-
-use std::fmt;
-
-#[derive(Debug)]
-struct MyError {
-    details: String
-}
-
-impl MyError {
-    fn new(msg: &str) -> MyError {
-        MyError{details: msg.to_string()}
-    }
-}
-
-impl fmt::Display for MyError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"{}",self.details)
-    }
-}
-
-impl Error for MyError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
 
 pub struct ConvertFilterCrossJoinToInnerJoinRule {
     matcher: RuleMatcher<OptRelNodeTyp>,
@@ -158,9 +132,6 @@ fn flatten_join_inputs<O: Optimizer<OptRelNodeTyp>>(
         OptRelNodeTyp::Join(_) => {
             LogicalJoin::from_rel_node(Arc::new(input_node.clone())).unwrap()
         }
-        OptRelNodeTyp::Placeholder(_group_id) => {
-            return false;
-        }
         _ => {
             return false;
         }
@@ -191,9 +162,6 @@ fn flatten_join_inputs<O: Optimizer<OptRelNodeTyp>>(
                     return false;
                 }
             }
-            OptRelNodeTyp::Placeholder(_group_id) => {
-                return false;
-            }
             _ => {
                 let child_ref = child.into_rel_node();
                 all_inputs.push(child_ref);
@@ -217,25 +185,27 @@ fn intersect(
 
 fn extract_possible_join_keys(expr: &Expr, possible_join_keys: &mut HashSet<(OptRelNodeRef, OptRelNodeRef)>) -> bool {
     match expr.typ(){
-        OptRelNodeTyp::BinOp(BinOpType::Eq) => {
-            let bin_expr = BinOpExpr::from_rel_node(expr.clone().into_rel_node()).unwrap();
-            let left = bin_expr.left_child().into_rel_node();
-            let right = bin_expr.right_child().into_rel_node();
-            // Ensure that we don't add the same Join keys multiple times
-            if !(possible_join_keys.contains(&(left.clone(), right.clone()))
-                || possible_join_keys.contains(&(right.clone(), left.clone())))
-            {
-                possible_join_keys.insert((left.clone(), right.clone()));
-            }
-        }
-        OptRelNodeTyp::LogOp(log_op_type) => {
-            let log_expr = LogOpExpr::from_rel_node(expr.clone().into_rel_node()).unwrap();
-            let expr_list = log_expr.children();
-            match log_op_type{
-                LogOpType::And => {
+        OptRelNodeTyp::BinOp(binop_type) => {
+            match binop_type{
+                BinOpType::Eq => {
+                    let bin_expr = BinOpExpr::from_rel_node(expr.clone().into_rel_node()).unwrap();
+                    let left = bin_expr.left_child().into_rel_node();
+                    let right = bin_expr.right_child().into_rel_node();
+                    // Ensure that we don't add the same Join keys multiple times
+                    if !(possible_join_keys.contains(&(left.clone(), right.clone()))
+                        || possible_join_keys.contains(&(right.clone(), left.clone())))
+                    {
+                        possible_join_keys.insert((left.clone(), right.clone()));
+                    }
+                }
+                BinOpType::And => {
+                    let bin_expr = BinOpExpr::from_rel_node(expr.clone().into_rel_node()).unwrap();
+                    let left = bin_expr.left_child();
+                    let right = bin_expr.right_child();
+                    let expr_list = vec![left, right];
                     let mut invalid:bool = false;
                     (0..expr_list.len()).for_each(|i| {
-                        if !extract_possible_join_keys(&expr_list.child(i), possible_join_keys){
+                        if !extract_possible_join_keys(&expr_list[i], possible_join_keys){
                             invalid = true;
                         }
                     });
@@ -243,12 +213,16 @@ fn extract_possible_join_keys(expr: &Expr, possible_join_keys: &mut HashSet<(Opt
                         return false;
                     }
                 }
-                LogOpType::Or => {
+                BinOpType::Or => {
                     let mut initial_key_sets:HashSet<(OptRelNodeRef, OptRelNodeRef)> = HashSet::new();
                     let mut invalid:bool = false;
+                    let bin_expr = BinOpExpr::from_rel_node(expr.clone().into_rel_node()).unwrap();
+                    let left = bin_expr.left_child();
+                    let right = bin_expr.right_child();
+                    let expr_list = vec![left, right];
                     (0..expr_list.len()).for_each(&mut|i| {
                         let mut key_sets:HashSet<(OptRelNodeRef,OptRelNodeRef)> = HashSet::new();
-                        if !extract_possible_join_keys(&expr_list.child(i), &mut key_sets){
+                        if !extract_possible_join_keys(&expr_list[i], &mut key_sets){
                             invalid = true;
                         }
                         intersect(&mut initial_key_sets, &key_sets);
@@ -257,7 +231,10 @@ fn extract_possible_join_keys(expr: &Expr, possible_join_keys: &mut HashSet<(Opt
                         return false;
                     }
                 }
-            }
+                _ => {
+                    return false;
+                }
+            }   
         }
         _ => {
             return false;
