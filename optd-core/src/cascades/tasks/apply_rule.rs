@@ -12,7 +12,7 @@ use crate::{
         GroupId,
     },
     rel_node::{RelNode, RelNodeTyp},
-    rules::RuleMatcher,
+    rules::{RuleMatcher, RuleType},
 };
 
 use super::Task;
@@ -189,12 +189,44 @@ impl<T: RelNodeTyp> Task<T> for ApplyRuleTask {
         }
 
         let rule = optimizer.rules()[self.rule_id].clone();
-        trace!(event = "task_begin", task = "apply_rule", expr_id = %self.expr_id, rule_id = %self.rule_id, rule = %rule.name());
+        trace!(event = "task_begin", task = "apply_rule", expr_id = %self.expr_id, rule_id = %self.rule_id, rule = %rule.name(), rule_type = %rule.get_rule_type());
         let group_id = optimizer.get_group_id(self.expr_id);
         let mut tasks = vec![];
         let binding_exprs = match_and_pick_expr(rule.matcher(), self.expr_id, optimizer);
         for expr in binding_exprs {
             let applied = rule.apply(optimizer, expr);
+
+            if rule.get_rule_type() == RuleType::Normalization {
+                assert!(
+                    applied.len() == 1,
+                    "normalization rule should always return one expr"
+                );
+
+                let RelNode { typ, .. } = &applied[0];
+
+                // TODO: for normalization rule, can typ be a group?
+                if let Some(_) = typ.extract_group() {
+                    assert!(false, "normalization rule returns a group? 🤔️")
+                }
+
+                for new_expr in applied {
+                    // replace the old expr with the new expr
+                    optimizer.replace_group_expr(new_expr.into(), group_id, self.expr_id);
+
+                    // expr replacement will treat the new expr as not explored, but we need to mark current rule fired
+                    optimizer.mark_rule_fired(self.expr_id, self.rule_id);
+
+                    trace!(event = "apply_rule replace", expr_id = %self.expr_id, rule_id = %self.rule_id);
+
+                    // normalization rule are always logical, exploring its children
+                    tasks.push(
+                        Box::new(OptimizeExpressionTask::new(self.expr_id, self.exploring))
+                            as Box<dyn Task<T>>,
+                    );
+                }
+                continue;
+            }
+
             for expr in applied {
                 let RelNode { typ, .. } = &expr;
                 if let Some(group_id_2) = typ.extract_group() {

@@ -48,10 +48,12 @@ impl<T: RelNodeTyp> Task<T> for OptimizeExpressionTask {
             if optimizer.is_rule_fired(self.expr_id, rule_id) {
                 continue;
             }
+            // Skip impl rules when exploring
             if self.exploring && rule.is_impl_rule() {
                 continue;
             }
-            if optimizer.ctx.budget_used && !rule.is_impl_rule() {
+            // Skip transformation rules when budget is used
+            if optimizer.ctx.budget_used && !rule.is_xform_rule() {
                 break;
             }
             if top_matches(rule.matcher(), expr.typ.clone(), expr.data.clone()) {
@@ -59,8 +61,14 @@ impl<T: RelNodeTyp> Task<T> for OptimizeExpressionTask {
                     Box::new(ApplyRuleTask::new(rule_id, self.expr_id, self.exploring))
                         as Box<dyn Task<T>>,
                 );
-                for &input_group_id in &expr.children {
-                    tasks.push(Box::new(ExploreGroupTask::new(input_group_id)) as Box<dyn Task<T>>);
+                // TODO: if the rule is a normalization rule, we know that the old expr will be replaced
+                // as long as the rule is matched, so there's no need to explore the input?
+                if !rule.is_norm_rule() {
+                    for &input_group_id in &expr.children {
+                        tasks.push(
+                            Box::new(ExploreGroupTask::new(input_group_id)) as Box<dyn Task<T>>
+                        );
+                    }
                 }
             }
         }

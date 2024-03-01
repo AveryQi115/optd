@@ -145,7 +145,7 @@ macro_rules! apply_matcher {
 }
 
 macro_rules! define_rule_inner {
-    ($is_impl_rule:expr, $name:ident, $apply:ident, $($matcher:tt)+) => {
+    ($rule_type:expr, $name:ident, $apply:ident, $($matcher:tt)+) => {
         pub struct $name {
             matcher: RuleMatcher<OptRelNodeTyp>,
         }
@@ -196,8 +196,8 @@ macro_rules! define_rule_inner {
                 }
             }
 
-            fn is_impl_rule(&self) -> bool {
-                $is_impl_rule
+            fn get_rule_type(&self) -> optd_core::rules::RuleType {
+                $rule_type
             }
         }
     };
@@ -205,13 +205,19 @@ macro_rules! define_rule_inner {
 
 macro_rules! define_rule {
     ($name:ident, $apply:ident, $($matcher:tt)+) => {
-        crate::rules::macros::define_rule_inner! { false, $name, $apply, $($matcher)+ }
+        crate::rules::macros::define_rule_inner! { optd_core::rules::RuleType::Transformation, $name, $apply, $($matcher)+ }
     };
 }
 
 macro_rules! define_impl_rule {
     ($name:ident, $apply:ident, $($matcher:tt)+) => {
-        crate::rules::macros::define_rule_inner! { true, $name, $apply, $($matcher)+ }
+        crate::rules::macros::define_rule_inner! { optd_core::rules::RuleType::Implementation, $name, $apply, $($matcher)+ }
+    };
+}
+
+macro_rules! define_norm_rule {
+    ($name:ident, $apply:ident, $($matcher:tt)+) => {
+        crate::rules::macros::define_rule_inner! { optd_core::rules::RuleType::Normalization, $name, $apply, $($matcher)+ }
     };
 }
 
@@ -219,6 +225,7 @@ pub(crate) use apply_matcher;
 pub(crate) use collect_picks;
 pub(crate) use define_impl_rule;
 pub(crate) use define_matcher;
+pub(crate) use define_norm_rule;
 pub(crate) use define_picks;
 pub(crate) use define_picks_struct;
 pub(crate) use define_rule;

@@ -283,6 +283,19 @@ impl<T: RelNodeTyp> CascadesOptimizer<T> {
         self.memo.add_new_group_expr(expr, group_id)
     }
 
+    pub(super) fn replace_group_expr(
+        &mut self,
+        expr: RelNodeRef<T>,
+        group_id: GroupId,
+        expr_id: ExprId,
+    ) {
+        // the old expr is replaced, so we clear the fired rules for old expr
+        self.fired_rules
+            .entry(expr_id)
+            .and_modify(|fired_rules| fired_rules.clear());
+        self.memo.replace_group_expr(expr_id, group_id, expr);
+    }
+
     pub(super) fn get_group_info(&self, group_id: GroupId) -> GroupInfo {
         self.memo.get_group_info(group_id)
     }
