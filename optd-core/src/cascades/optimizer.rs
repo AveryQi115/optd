@@ -81,7 +81,7 @@ impl<T: RelNodeTyp> CascadesOptimizer<T> {
     pub fn new(
         rules: Vec<Arc<dyn Rule<T, Self>>>,
         cost: Box<dyn CostModel<T>>,
-        property_builders: Vec<Box<dyn PropertyBuilderAny<T>>>,
+        property_builders: Arc<[Box<dyn PropertyBuilderAny<T>>]>,
     ) -> Self {
         Self::new_with_prop(rules, cost, property_builders, Default::default())
     }
@@ -89,7 +89,7 @@ impl<T: RelNodeTyp> CascadesOptimizer<T> {
     pub fn new_with_prop(
         rules: Vec<Arc<dyn Rule<T, Self>>>,
         cost: Box<dyn CostModel<T>>,
-        property_builders: Vec<Box<dyn PropertyBuilderAny<T>>>,
+        property_builders: Arc<[Box<dyn PropertyBuilderAny<T>>]>,
         prop: OptimizerProperties,
     ) -> Self {
         let tasks = VecDeque::new();

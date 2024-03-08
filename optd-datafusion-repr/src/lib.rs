@@ -5,18 +5,16 @@ use std::sync::Arc;
 use anyhow::Result;
 use cost::{AdaptiveCostModel, RuntimeAdaptionStorage};
 use optd_core::{
-    optimizer::Optimizer,
-    cascades::{CascadesOptimizer, GroupId, OptimizerProperties},
-    heuristics::{ApplyOrder, HeuristicsOptimizer},
-    rules::Rule,
+    cascades::{CascadesOptimizer, GroupId, OptimizerProperties}, heuristics::{ApplyOrder, HeuristicsOptimizer}, optimizer::Optimizer, property::PropertyBuilder, rules::Rule
 };
+use optd_core::property::PropertyBuilderAny;
 use plan_nodes::{OptRelNode, OptRelNodeRef, OptRelNodeTyp, PlanNode};
 use properties::{
     column_ref::ColumnRefPropertyBuilder,
     schema::{Catalog, SchemaPropertyBuilder},
 };
 use rules::{
-    ConvertFilterCrossJoinToInnerJoinRule, EliminateDuplicatedAggExprRule, EliminateDuplicatedSortExprRule, EliminateFilterRule, EliminateJoinRule, EliminateLimitRule, HashJoinRule, JoinAssocRule, JoinCommuteRule, PhysicalConversionRule, ProjectionPullUpJoin
+    EliminateDuplicatedAggExprRule, EliminateDuplicatedSortExprRule, EliminateFilterRule, EliminateJoinRule, EliminateLimitRule, HashJoinRule, JoinAssocRule, JoinCommuteRule, PhysicalConversionRule, ProjectionPullUpJoin
 };
 
 pub use adaptive::PhysicalCollector;
@@ -90,21 +88,22 @@ impl DatafusionOptimizer {
         let heuristic_rules = Self::default_heuristic_rules();
 
         let cost_model = AdaptiveCostModel::new(50);
+        let property_builders:Arc<[Box<dyn PropertyBuilderAny<OptRelNodeTyp>>]> = Arc::new([
+            Box::new(SchemaPropertyBuilder::new(catalog.clone())),
+            Box::new(ColumnRefPropertyBuilder::new(catalog)),
+        ]);
         Self {
             runtime_statistics: cost_model.get_runtime_map(),
             optimizer: CascadesOptimizer::new_with_prop(
                 cascades_rules,
                 Box::new(cost_model),
-                vec![
-                    Box::new(SchemaPropertyBuilder::new(catalog.clone())),
-                    Box::new(ColumnRefPropertyBuilder::new(catalog)),
-                ],
+                property_builders.clone(),
                 OptimizerProperties {
                     partial_explore_iter: Some(1 << 20),
                     partial_explore_space: Some(1 << 10),
                 },
             ),
-            hueristic_optimizer: HeuristicsOptimizer::new_with_rules(heuristic_rules, ApplyOrder::BottomUp),
+            hueristic_optimizer: HeuristicsOptimizer::new_with_rules(heuristic_rules, ApplyOrder::BottomUp, property_builders.clone()),
             enable_adaptive: false,
             enable_heuristic: true,
         }
@@ -115,21 +114,22 @@ impl DatafusionOptimizer {
         let cascades_rules = Self::default_cascades_rules();
         let heuristic_rules = Self::default_heuristic_rules();
         let cost_model = AdaptiveCostModel::new(50);
+        let property_builders:Arc<[Box<dyn PropertyBuilderAny<OptRelNodeTyp>>]> = Arc::new([
+            Box::new(SchemaPropertyBuilder::new(catalog.clone())),
+            Box::new(ColumnRefPropertyBuilder::new(catalog)),
+        ]);
         Self {
             runtime_statistics: cost_model.get_runtime_map(),
             optimizer: CascadesOptimizer::new_with_prop(
                 cascades_rules,
                 Box::new(cost_model),
-                vec![
-                    Box::new(SchemaPropertyBuilder::new(catalog.clone())),
-                    Box::new(ColumnRefPropertyBuilder::new(catalog)),
-                ],
+                property_builders.clone(),
                 OptimizerProperties {
                     partial_explore_iter: Some(1 << 20),
                     partial_explore_space: Some(1 << 10),
                 },
             ),
-            hueristic_optimizer: HeuristicsOptimizer::new_with_rules(heuristic_rules, ApplyOrder::BottomUp),
+            hueristic_optimizer: HeuristicsOptimizer::new_with_rules(heuristic_rules, ApplyOrder::BottomUp, property_builders.clone()),
             enable_adaptive: true,
             enable_heuristic: true,
         }
@@ -146,16 +146,17 @@ impl DatafusionOptimizer {
 
         let cost_model = AdaptiveCostModel::new(1000); // very large decay
         let runtime_statistics = cost_model.get_runtime_map();
+        let property_builders:Arc<[Box<dyn PropertyBuilderAny<OptRelNodeTyp>>]> = Arc::new([
+            Box::new(SchemaPropertyBuilder::new(catalog.clone())),
+            Box::new(ColumnRefPropertyBuilder::new(catalog)),
+        ]);
         let cascades_optimizer = CascadesOptimizer::new(
             cascades_rules,
             Box::new(cost_model),
-            vec![
-                Box::new(SchemaPropertyBuilder::new(catalog.clone())),
-                Box::new(ColumnRefPropertyBuilder::new(catalog)),
-            ],
+            property_builders.clone(),
         );
         let heuristics_rules = Self::default_heuristic_rules();
-        let heuristic_optimizer = HeuristicsOptimizer::new_with_rules(heuristics_rules, ApplyOrder::BottomUp);
+        let heuristic_optimizer = HeuristicsOptimizer::new_with_rules(heuristics_rules, ApplyOrder::BottomUp, property_builders.clone());
         Self {
             hueristic_optimizer: heuristic_optimizer,
             runtime_statistics: runtime_statistics,

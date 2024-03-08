@@ -39,7 +39,7 @@ pub fn main() {
                 .map(|(x, y)| (x.to_string(), PerTableStats::new(y, vec![])))
                 .collect(),
         )),
-        vec![],
+        Arc::new([]),
     );
 
     // The plan: (filter (scan t1) #1=2) join (scan t2) join (scan t3)
@@ -81,6 +81,7 @@ pub fn main() {
             Arc::new(HashJoinRule::new()),
         ],
         optd_core::heuristics::ApplyOrder::BottomUp,
+        Arc::new([]),
     );
     let node = optimizer.optimize(fnal.0.into_rel_node()).unwrap();
     println!(

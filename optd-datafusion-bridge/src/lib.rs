@@ -231,9 +231,7 @@ impl OptdQueryPlanner {
         if optimizer.is_heuristic_enabled(){
             optd_rel = optimizer.heuristic_optimize(optd_rel)?;
         }
-        println!("{}", optd_rel.to_string());
         let (group_id, optimized_rel) = optimizer.optimize(optd_rel)?;
-        println!("{}", optimized_rel.to_string());
         if let Some(explains) = &mut explains {
             explains.push(StringifiedPlan::new(
                 PlanType::OptimizedPhysicalPlan {

@@ -1,10 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
+use std::any::Any;
+use itertools::Itertools;
 
 use crate::{
     optimizer::Optimizer,
     rel_node::{RelNode, RelNodeRef, RelNodeTyp},
+    property::PropertyBuilderAny,
     rules::{Rule, RuleMatcher},
 };
 
@@ -16,6 +19,8 @@ pub enum ApplyOrder {
 pub struct HeuristicsOptimizer<T: RelNodeTyp> {
     rules: Arc<[Arc<dyn Rule<T, Self>>]>,
     apply_order: ApplyOrder,
+    property_builders: Arc<[Box<dyn PropertyBuilderAny<T>>]>,
+    properties: HashMap<RelNodeRef<T>, Arc<[Box<dyn Any + Send + Sync + 'static>]>>,
 }
 
 fn match_node<T: RelNodeTyp>(
@@ -102,10 +107,12 @@ fn match_and_pick<T: RelNodeTyp>(
 }
 
 impl<T: RelNodeTyp> HeuristicsOptimizer<T> {
-    pub fn new_with_rules(rules: Vec<Arc<dyn Rule<T, Self>>>, apply_order: ApplyOrder) -> Self {
+    pub fn new_with_rules(rules: Vec<Arc<dyn Rule<T, Self>>>, apply_order: ApplyOrder, property_builders: Arc<[Box<dyn PropertyBuilderAny<T>>]>) -> Self {
         Self {
             rules: rules.into(),
             apply_order,
+            property_builders,
+            properties: HashMap::new(),
         }
     }
 
@@ -141,19 +148,52 @@ impl<T: RelNodeTyp> HeuristicsOptimizer<T> {
                     }
                     .into(),
                 )?;
+                self.infer_properties(root_rel.clone());
+                self.properties.insert(node.clone(), self.properties.get(&root_rel.clone()).unwrap().clone());
                 Ok(node)
             }
             ApplyOrder::TopDown => {
                 let root_rel = self.apply_rules(root_rel)?;
                 let optimized_children = self.optimize_inputs(&root_rel.children)?;
-                Ok(RelNode {
+                let node: Arc<RelNode<T>> = RelNode {
                     typ: root_rel.typ.clone(),
                     children: optimized_children,
                     data: root_rel.data.clone(),
-                }
-                .into())
+                }.into();
+                self.infer_properties(root_rel.clone());
+                self.properties.insert(node.clone(), self.properties.get(&root_rel.clone()).unwrap().clone());
+                Ok(node)
             }
         }
+    }
+
+    fn infer_properties(&mut self, root_rel: RelNodeRef<T>) {
+        if self.properties.contains_key(&root_rel) {
+            return;
+        }
+
+        let child_properties = root_rel
+            .children
+            .iter()
+            .map(|child| {
+                self.infer_properties((*child).clone());
+                self.properties.get(child).unwrap().clone()
+            })
+            .collect_vec();
+        let mut props = Vec::with_capacity(self.property_builders.len());
+        for (id, builder) in self.property_builders.iter().enumerate() {
+            let child_properties = child_properties
+                .iter()
+                .map(|x| x[id].as_ref() as &dyn std::any::Any)
+                .collect::<Vec<_>>();
+            let prop = builder.derive_any(
+                root_rel.typ.clone(),
+                root_rel.data.clone(),
+                child_properties.as_slice(),
+            );
+            props.push(prop);
+        }
+        self.properties.insert(root_rel.clone(), props.into());
     }
 }
 
@@ -167,8 +207,8 @@ impl<T: RelNodeTyp> Optimizer<T> for HeuristicsOptimizer<T> {
         root_rel: RelNodeRef<T>,
         idx: usize,
     ) -> P::Prop {
-        let _ = root_rel;
-        let _ = idx;
-        unimplemented!()
+        let props = self.properties.get(&root_rel).unwrap();
+        let prop = props[idx].as_ref();
+        prop.downcast_ref::<P::Prop>().unwrap().clone()
     }
 }
