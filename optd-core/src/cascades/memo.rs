@@ -248,12 +248,15 @@ impl<T: RelNodeTyp> Memo<T> {
         self.groups.insert(group_id, group);
     }
 
+    // return true: replace success, the expr_id is replaced by the new rel_node
+    // return false: replace failed as the new rel node already exists in other groups,
+    //             the old expr_id should be marked as all rules are fired for it
     pub fn replace_group_expr(
         &mut self,
         expr_id: ExprId,
         replace_group_id: GroupId,
         rel_node: RelNodeRef<T>,
-    ) {
+    ) -> bool {
         let replace_group_id = self.get_reduced_group_id(replace_group_id);
 
         if let Entry::Occupied(mut entry) = self.groups.entry(replace_group_id) {
@@ -286,15 +289,16 @@ impl<T: RelNodeTyp> Memo<T> {
                 let group_id = self.get_reduced_group_id(group_id);
                 self.merge_group_inner(replace_group_id, group_id);
 
-                // TODO: how to safely remove the old expr from the group?
-                return;
+                // TODO: instead of remove this expr from the old group,
+                // we mark the expr as all rules have been fired to make it a dead end
+                return false;
             }
 
             self.expr_id_to_expr_node
                 .insert(expr_id, memo_node.clone().into());
             self.expr_node_to_expr_id.insert(memo_node.clone(), expr_id);
 
-            return;
+            return true;
         }
         unreachable!("group not found in replace_group_expr");
     }

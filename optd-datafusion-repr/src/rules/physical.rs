@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use optd_core::optimizer::Optimizer;
 use optd_core::rel_node::RelNode;
-use optd_core::rules::{Rule, RuleMatcher, RuleType};
+use optd_core::rules::{Rule, RuleMatcher};
 
 use crate::plan_nodes::{JoinType, OptRelNodeTyp};
 
@@ -140,8 +140,8 @@ impl<O: Optimizer<OptRelNodeTyp>> Rule<OptRelNodeTyp, O> for PhysicalConversionR
         }
     }
 
-    fn get_rule_type(&self) -> RuleType {
-        RuleType::Implementation
+    fn is_impl_rule(&self) -> bool {
+        true
     }
 
     fn name(&self) -> &'static str {

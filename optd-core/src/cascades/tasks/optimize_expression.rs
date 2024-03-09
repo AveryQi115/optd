@@ -44,7 +44,8 @@ impl<T: RelNodeTyp> Task<T> for OptimizeExpressionTask {
         let expr = optimizer.get_expr_memoed(self.expr_id);
         trace!(event = "task_begin", task = "optimize_expr", expr_id = %self.expr_id, expr = %expr);
         let mut tasks = vec![];
-        for (rule_id, rule) in optimizer.rules().iter().enumerate() {
+        for (rule_id, rule_wrapper) in optimizer.rules().iter().enumerate() {
+            let rule = rule_wrapper.rule();
             if optimizer.is_rule_fired(self.expr_id, rule_id) {
                 continue;
             }
@@ -53,7 +54,7 @@ impl<T: RelNodeTyp> Task<T> for OptimizeExpressionTask {
                 continue;
             }
             // Skip transformation rules when budget is used
-            if optimizer.ctx.budget_used && !rule.is_xform_rule() {
+            if optimizer.ctx.budget_used && !rule.is_impl_rule() {
                 break;
             }
             if top_matches(rule.matcher(), expr.typ.clone(), expr.data.clone()) {
@@ -61,14 +62,8 @@ impl<T: RelNodeTyp> Task<T> for OptimizeExpressionTask {
                     Box::new(ApplyRuleTask::new(rule_id, self.expr_id, self.exploring))
                         as Box<dyn Task<T>>,
                 );
-                // TODO: if the rule is a normalization rule, we know that the old expr will be replaced
-                // as long as the rule is matched, so there's no need to explore the input?
-                if !rule.is_norm_rule() {
-                    for &input_group_id in &expr.children {
-                        tasks.push(
-                            Box::new(ExploreGroupTask::new(input_group_id)) as Box<dyn Task<T>>
-                        );
-                    }
+                for &input_group_id in &expr.children {
+                    tasks.push(Box::new(ExploreGroupTask::new(input_group_id)) as Box<dyn Task<T>>);
                 }
             }
         }

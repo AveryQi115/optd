@@ -12,7 +12,7 @@ use crate::{
         GroupId,
     },
     rel_node::{RelNode, RelNodeTyp},
-    rules::{RuleMatcher, RuleType},
+    rules::{OptimizeType, RuleMatcher},
 };
 
 use super::Task;
@@ -188,25 +188,40 @@ impl<T: RelNodeTyp> Task<T> for ApplyRuleTask {
             return Ok(vec![]);
         }
 
-        let rule = optimizer.rules()[self.rule_id].clone();
-        trace!(event = "task_begin", task = "apply_rule", expr_id = %self.expr_id, rule_id = %self.rule_id, rule = %rule.name(), rule_type = %rule.get_rule_type());
+        let rule_wrapper = optimizer.rules()[self.rule_id].clone();
+        let rule = rule_wrapper.rule();
+
+        trace!(event = "task_begin", task = "apply_rule", expr_id = %self.expr_id, rule_id = %self.rule_id, rule = %rule.name(), optimize_type=%rule_wrapper.optimize_type());
         let group_id = optimizer.get_group_id(self.expr_id);
         let mut tasks = vec![];
         let binding_exprs = match_and_pick_expr(rule.matcher(), self.expr_id, optimizer);
         for expr in binding_exprs {
             let applied = rule.apply(optimizer, expr);
 
-            if rule.get_rule_type() == RuleType::Normalization {
+            if rule_wrapper.optimize_type() == OptimizeType::Heuristics {
                 assert!(
-                    applied.len() == 1,
-                    "normalization rule should always return one expr"
+                    applied.len() <= 1,
+                    "rules registered as heuristics should always return equal or less than one expr"
                 );
+
+                if applied.is_empty() {
+                    continue;
+                }
 
                 let RelNode { typ, .. } = &applied[0];
 
-                // TODO: for normalization rule, can typ be a group?
-                if let Some(_) = typ.extract_group() {
-                    assert!(false, "normalization rule returns a group? 🤔️")
+                assert!(
+                    !rule.is_impl_rule(),
+                    "impl rule registered should not be registered as heuristics"
+                );
+
+                if let Some(group_id_2) = typ.extract_group() {
+                    // If this is a group, merge the groups!
+                    optimizer.merge_group(group_id, group_id_2);
+                    // mark the old expr as a dead end
+                    (0..optimizer.rules().len())
+                        .for_each(|i| optimizer.mark_rule_fired(self.expr_id, i));
+                    continue;
                 }
 
                 for new_expr in applied {
@@ -218,7 +233,7 @@ impl<T: RelNodeTyp> Task<T> for ApplyRuleTask {
 
                     trace!(event = "apply_rule replace", expr_id = %self.expr_id, rule_id = %self.rule_id);
 
-                    // normalization rule are always logical, exploring its children
+                    // rules registed as heuristics are always logical, exploring its children
                     tasks.push(
                         Box::new(OptimizeExpressionTask::new(self.expr_id, self.exploring))
                             as Box<dyn Task<T>>,

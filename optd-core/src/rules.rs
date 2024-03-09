@@ -1,7 +1,8 @@
 mod ir;
 
 use std::collections::HashMap;
-use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 use crate::{
     optimizer::Optimizer,
@@ -10,26 +11,38 @@ use crate::{
 
 pub use ir::RuleMatcher;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RuleType {
-    /// Implementation rules are used to convert logical plan to physical plan
-    Implementation,
-
-    /// transformation rules are used to generate new logical plan, default type
-    Transformation,
-
-    /// normalization rules are like heuristics rules, which always apply when matched
-    /// , are used to simplify the plan and new generated plan will replace original ones
-    Normalization,
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum OptimizeType {
+    Cascades,
+    Heuristics,
 }
 
-impl fmt::Display for RuleType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for OptimizeType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            RuleType::Implementation => write!(f, "Implementation"),
-            RuleType::Transformation => write!(f, "Transformation"),
-            RuleType::Normalization => write!(f, "Normalization"),
+            Self::Cascades => write!(f, "cascades"),
+            Self::Heuristics => write!(f, "heuristics"),
         }
+    }
+}
+
+pub struct RuleWrapper<T: RelNodeTyp, O: Optimizer<T>> {
+    pub rule: Arc<dyn Rule<T, O>>,
+    pub optimize_type: OptimizeType,
+}
+
+impl<T: RelNodeTyp, O: Optimizer<T>> RuleWrapper<T, O> {
+    pub fn new(rule: Arc<dyn Rule<T, O>>, optimizer_type: OptimizeType) -> Self {
+        Self {
+            rule,
+            optimize_type: optimizer_type,
+        }
+    }
+    pub fn rule(&self) -> Arc<dyn Rule<T, O>> {
+        self.rule.clone()
+    }
+    pub fn optimize_type(&self) -> OptimizeType {
+        self.optimize_type
     }
 }
 
@@ -38,15 +51,6 @@ pub trait Rule<T: RelNodeTyp, O: Optimizer<T>>: 'static + Send + Sync {
     fn apply(&self, optimizer: &O, input: HashMap<usize, RelNode<T>>) -> Vec<RelNode<T>>;
     fn name(&self) -> &'static str;
     fn is_impl_rule(&self) -> bool {
-        self.get_rule_type() == RuleType::Implementation
-    }
-    fn is_xform_rule(&self) -> bool {
-        self.get_rule_type() == RuleType::Transformation
-    }
-    fn is_norm_rule(&self) -> bool {
-        self.get_rule_type() == RuleType::Normalization
-    }
-    fn get_rule_type(&self) -> RuleType {
-        RuleType::Transformation
+        false
     }
 }
