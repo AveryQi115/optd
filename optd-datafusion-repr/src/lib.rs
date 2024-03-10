@@ -6,7 +6,7 @@ use anyhow::Result;
 use cost::{AdaptiveCostModel, RuntimeAdaptionStorage};
 use optd_core::{
     cascades::{CascadesOptimizer, GroupId, OptimizerProperties},
-    rules::{OptimizeType, RuleWrapper},
+    rules::RuleWrapper,
 };
 use plan_nodes::{OptRelNode, OptRelNodeRef, OptRelNodeTyp, PlanNode};
 use properties::{
@@ -52,44 +52,30 @@ impl DatafusionOptimizer {
         let rules = PhysicalConversionRule::all_conversions();
         let mut rule_wrappers = Vec::new();
         for rule in rules {
-            rule_wrappers.push(Arc::new(RuleWrapper::new(rule, OptimizeType::Cascades)));
+            rule_wrappers.push(RuleWrapper::new_cascades(rule));
         }
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(HashJoinRule::new()),
-            OptimizeType::Cascades,
+        rule_wrappers.push(RuleWrapper::new_cascades(Arc::new(HashJoinRule::new())));
+        rule_wrappers.push(RuleWrapper::new_cascades(Arc::new(JoinCommuteRule::new())));
+        rule_wrappers.push(RuleWrapper::new_cascades(Arc::new(JoinAssocRule::new())));
+        rule_wrappers.push(RuleWrapper::new_cascades(Arc::new(
+            ProjectionPullUpJoin::new(),
         )));
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(JoinCommuteRule::new()),
-            OptimizeType::Cascades,
+        rule_wrappers.push(RuleWrapper::new_heuristic(Arc::new(
+            EliminateJoinRule::new(),
         )));
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(JoinAssocRule::new()),
-            OptimizeType::Cascades,
+        rule_wrappers.push(RuleWrapper::new_heuristic(Arc::new(
+            EliminateFilterRule::new(),
         )));
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(ProjectionPullUpJoin::new()),
-            OptimizeType::Cascades,
+        rule_wrappers.push(RuleWrapper::new_heuristic(Arc::new(
+            EliminateLimitRule::new(),
         )));
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(EliminateJoinRule::new()),
-            OptimizeType::Heuristics,
+        rule_wrappers.push(RuleWrapper::new_heuristic(Arc::new(
+            EliminateDuplicatedSortExprRule::new(),
         )));
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(EliminateFilterRule::new()),
-            OptimizeType::Heuristics,
+        rule_wrappers.push(RuleWrapper::new_heuristic(Arc::new(
+            EliminateDuplicatedAggExprRule::new(),
         )));
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(EliminateLimitRule::new()),
-            OptimizeType::Heuristics,
-        )));
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(EliminateDuplicatedSortExprRule::new()),
-            OptimizeType::Heuristics,
-        )));
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(EliminateDuplicatedAggExprRule::new()),
-            OptimizeType::Heuristics,
-        )));
+
         rule_wrappers
     }
 
@@ -142,39 +128,21 @@ impl DatafusionOptimizer {
         let rules = PhysicalConversionRule::all_conversions();
         let mut rule_wrappers = Vec::new();
         for rule in rules {
-            rule_wrappers.push(Arc::new(RuleWrapper::new(rule, OptimizeType::Cascades)));
+            rule_wrappers.push(RuleWrapper::new_cascades(rule));
         }
-        rule_wrappers.push(Arc::new(RuleWrapper::new(
-            Arc::new(HashJoinRule::new()),
-            OptimizeType::Cascades,
-        )));
+        rule_wrappers.push(RuleWrapper::new_cascades(Arc::new(HashJoinRule::new())));
         rule_wrappers.insert(
             0,
-            Arc::new(RuleWrapper::new(
-                Arc::new(JoinCommuteRule::new()),
-                OptimizeType::Cascades,
-            )),
+            RuleWrapper::new_cascades(Arc::new(JoinCommuteRule::new())),
         );
-        rule_wrappers.insert(
-            1,
-            Arc::new(RuleWrapper::new(
-                Arc::new(JoinAssocRule::new()),
-                OptimizeType::Cascades,
-            )),
-        );
+        rule_wrappers.insert(1, RuleWrapper::new_cascades(Arc::new(JoinAssocRule::new())));
         rule_wrappers.insert(
             2,
-            Arc::new(RuleWrapper::new(
-                Arc::new(ProjectionPullUpJoin::new()),
-                OptimizeType::Cascades,
-            )),
+            RuleWrapper::new_cascades(Arc::new(ProjectionPullUpJoin::new())),
         );
         rule_wrappers.insert(
             3,
-            Arc::new(RuleWrapper::new(
-                Arc::new(EliminateFilterRule::new()),
-                OptimizeType::Cascades,
-            )),
+            RuleWrapper::new_heuristic(Arc::new(EliminateFilterRule::new())),
         );
 
         let cost_model = AdaptiveCostModel::new(1000); // very large decay

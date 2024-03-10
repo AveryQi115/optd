@@ -5,7 +5,7 @@ use optd_core::{
     heuristics::HeuristicsOptimizer,
     optimizer::Optimizer,
     rel_node::Value,
-    rules::{OptimizeType, Rule, RuleWrapper},
+    rules::{Rule, RuleWrapper},
 };
 use optd_datafusion_repr::{
     cost::{OptCostModel, PerTableStats},
@@ -37,7 +37,7 @@ pub fn main() {
     ];
     let mut rule_wrappers = Vec::new();
     for rule in rules {
-        rule_wrappers.push(Arc::new(RuleWrapper::new(rule, OptimizeType::Cascades)));
+        rule_wrappers.push(RuleWrapper::new_cascades(rule));
     }
 
     let mut optimizer = CascadesOptimizer::new(

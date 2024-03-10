@@ -38,6 +38,18 @@ impl<T: RelNodeTyp, O: Optimizer<T>> RuleWrapper<T, O> {
             optimize_type: optimizer_type,
         }
     }
+    pub fn new_cascades(rule: Arc<dyn Rule<T, O>>) -> Arc<Self> {
+        Arc::new(Self {
+            rule,
+            optimize_type: OptimizeType::Cascades,
+        })
+    }
+    pub fn new_heuristic(rule: Arc<dyn Rule<T, O>>) -> Arc<Self> {
+        Arc::new(Self {
+            rule,
+            optimize_type: OptimizeType::Heuristics,
+        })
+    }
     pub fn rule(&self) -> Arc<dyn Rule<T, O>> {
         self.rule.clone()
     }
