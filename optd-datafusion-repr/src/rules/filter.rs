@@ -21,7 +21,7 @@ fn simplify_log_expr(log_expr: OptRelNodeRef) -> OptRelNodeRef {
     let log_expr = LogOpExpr::from_rel_node(log_expr).unwrap();
     let op = log_expr.op_type();
     let mut new_children = HashSet::new();
-    for child in log_expr.children().to_vec() {
+    for child in log_expr.children() {
         let mut new_child = child;
         if let OptRelNodeTyp::LogOp(_) = new_child.typ() {
             let new_expr = simplify_log_expr(new_child.into_rel_node().clone());

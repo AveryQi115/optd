@@ -56,7 +56,7 @@ impl DatafusionOptimizer {
     {
         let rules = PhysicalConversionRule::all_conversions();
         let mut rule_wrappers = vec![
-            // RuleWrapper::new_heuristic(Arc::new(SimplifyFilterRule::new())),
+            RuleWrapper::new_heuristic(Arc::new(SimplifyFilterRule::new())),
             RuleWrapper::new_heuristic(Arc::new(EliminateFilterRule::new())),
             RuleWrapper::new_heuristic(Arc::new(EliminateJoinRule::new())),
             RuleWrapper::new_heuristic(Arc::new(EliminateLimitRule::new())),

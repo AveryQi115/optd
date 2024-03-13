@@ -198,7 +198,7 @@ impl OptdPlanContext<'_> {
             OptRelNodeTyp::Sort => unreachable!(),
             OptRelNodeTyp::LogOp(typ) => {
                 let expr = LogOpExpr::from_rel_node(expr.into_rel_node()).unwrap();
-                let mut children = expr.children().to_vec().into_iter();
+                let mut children = expr.children().into_iter();
                 let first_expr = Self::conv_from_optd_expr(children.next().unwrap(), context)?;
                 let op = match typ {
                     LogOpType::And => datafusion::logical_expr::Operator::And,

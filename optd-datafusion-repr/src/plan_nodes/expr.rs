@@ -592,19 +592,28 @@ impl LogOpExpr {
         LogOpExpr(Expr(
             RelNode {
                 typ: OptRelNodeTyp::LogOp(op_type),
-                children: vec![expr_list.into_rel_node()],
+                children: expr_list
+                    .to_vec()
+                    .into_iter()
+                    .map(|x| x.into_rel_node())
+                    .collect(),
                 data: None,
             }
             .into(),
         ))
     }
 
-    pub fn children(&self) -> ExprList {
-        ExprList::from_rel_node(self.0.child(0)).unwrap()
+    pub fn children(&self) -> Vec<Expr> {
+        self.0
+             .0
+            .children
+            .iter()
+            .map(|x| Expr::from_rel_node(x.clone()).unwrap())
+            .collect()
     }
 
     pub fn child(&self, idx: usize) -> Expr {
-        self.children().child(idx)
+        Expr::from_rel_node(self.0.child(idx)).unwrap()
     }
 
     pub fn op_type(&self) -> LogOpType {
@@ -632,7 +641,7 @@ impl OptRelNode for LogOpExpr {
         Pretty::simple_record(
             self.op_type().to_string(),
             vec![],
-            vec![self.children().explain()],
+            self.children().iter().map(|x| x.explain()).collect(),
         )
     }
 }
