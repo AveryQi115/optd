@@ -91,7 +91,7 @@ fn apply_simplify_filter(
             let new_log_expr = simplify_log_expr(Arc::new(cond));
             let filter_node = RelNode {
                 typ: OptRelNodeTyp::Filter,
-                children: vec![child.into(), new_log_expr.into()],
+                children: vec![child.into(), new_log_expr],
                 data: None,
             };
             vec![filter_node]

@@ -637,11 +637,14 @@ impl OptRelNode for LogOpExpr {
         Expr::from_rel_node(rel_node).map(Self)
     }
 
-    fn dispatch_explain(&self) -> Pretty<'static> {
+    fn dispatch_explain(&self, meta_map: Option<&RelNodeMetaMap>) -> Pretty<'static> {
         Pretty::simple_record(
             self.op_type().to_string(),
             vec![],
-            self.children().iter().map(|x| x.explain()).collect(),
+            self.children()
+                .iter()
+                .map(|x| x.explain(meta_map))
+                .collect(),
         )
     }
 }

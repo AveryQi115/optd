@@ -279,7 +279,6 @@ impl OptRelNode for Expr {
     }
     fn from_rel_node(rel_node: OptRelNodeRef) -> Option<Self> {
         if !rel_node.typ.is_expression() {
-            println!("{}", rel_node.typ.to_string());
             return None;
         }
         Some(Self(rel_node))
