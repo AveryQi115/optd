@@ -8,18 +8,18 @@ use datafusion_expr::Expr as DFExpr;
 use optd_core::rel_node::RelNode;
 use optd_datafusion_repr::plan_nodes::{
     BetweenExpr, BinOpExpr, BinOpType, CastExpr, ColumnRefExpr, ConstantExpr, Expr, ExprList,
-    FuncExpr, FuncType, InListExpr, JoinType, LikeExpr, LogOpExpr, LogOpType, LogicalAgg, LogicalEmptyRelation,
-    LogicalFilter, LogicalJoin, LogicalLimit, LogicalProjection, LogicalScan, LogicalSort,
-    OptRelNode, OptRelNodeRef, OptRelNodeTyp, PlanNode, SortOrderExpr, SortOrderType,
+    FuncExpr, FuncType, InListExpr, JoinType, LikeExpr, LogOpExpr, LogOpType, LogicalAgg,
+    LogicalEmptyRelation, LogicalFilter, LogicalJoin, LogicalLimit, LogicalProjection, LogicalScan,
+    LogicalSort, OptRelNode, OptRelNodeRef, OptRelNodeTyp, PlanNode, SortOrderExpr, SortOrderType,
 };
 
 use crate::OptdPlanContext;
 
-fn flatten_nested_logical(op: LogOpType, expr_list: ExprList)->ExprList{
-    // conv_into_optd_expr is building the children bottom up so there is no need to 
+fn flatten_nested_logical(op: LogOpType, expr_list: ExprList) -> ExprList {
+    // conv_into_optd_expr is building the children bottom up so there is no need to
     // call flatten_nested_logical recursively
     let mut new_expr_list = Vec::new();
-    for child in expr_list.to_vec(){
+    for child in expr_list.to_vec() {
         if let OptRelNodeTyp::LogOp(child_op) = child.typ() {
             if child_op == op {
                 let child_log_op_expr = LogOpExpr::from_rel_node(child.into_rel_node()).unwrap();
@@ -29,7 +29,7 @@ fn flatten_nested_logical(op: LogOpType, expr_list: ExprList)->ExprList{
         }
         new_expr_list.push(child.clone());
     }
-    return ExprList::new(new_expr_list);
+    ExprList::new(new_expr_list)
 }
 
 impl OptdPlanContext<'_> {
@@ -64,7 +64,7 @@ impl OptdPlanContext<'_> {
             Expr::BinaryExpr(node) => {
                 let left = self.conv_into_optd_expr(node.left.as_ref(), context)?;
                 let right = self.conv_into_optd_expr(node.right.as_ref(), context)?;
-                match node.op{
+                match node.op {
                     Operator::And => {
                         let op = LogOpType::And;
                         let expr_list = ExprList::new(vec![left, right]);

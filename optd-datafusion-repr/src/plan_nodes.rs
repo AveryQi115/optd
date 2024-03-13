@@ -25,9 +25,9 @@ pub use agg::{LogicalAgg, PhysicalAgg};
 pub use apply::{ApplyType, LogicalApply};
 pub use empty_relation::{LogicalEmptyRelation, PhysicalEmptyRelation};
 pub use expr::{
-    LogOpExpr, LogOpType, BetweenExpr, BinOpExpr, BinOpType, CastExpr, ColumnRefExpr, ConstantExpr, ConstantType,
-    DataTypeExpr, ExprList, FuncExpr, FuncType, InListExpr, LikeExpr, SortOrderExpr, SortOrderType,
-    UnOpExpr, UnOpType,
+    BetweenExpr, BinOpExpr, BinOpType, CastExpr, ColumnRefExpr, ConstantExpr, ConstantType,
+    DataTypeExpr, ExprList, FuncExpr, FuncType, InListExpr, LikeExpr, LogOpExpr, LogOpType,
+    SortOrderExpr, SortOrderType, UnOpExpr, UnOpType,
 };
 pub use filter::{LogicalFilter, PhysicalFilter};
 pub use join::{JoinType, LogicalJoin, PhysicalHashJoin, PhysicalNestedLoopJoin};
@@ -260,7 +260,7 @@ impl OptRelNode for PlanNode {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Expr(OptRelNodeRef);
 
 impl Expr {
@@ -279,6 +279,7 @@ impl OptRelNode for Expr {
     }
     fn from_rel_node(rel_node: OptRelNodeRef) -> Option<Self> {
         if !rel_node.typ.is_expression() {
+            println!("{}", rel_node.typ.to_string());
             return None;
         }
         Some(Self(rel_node))
