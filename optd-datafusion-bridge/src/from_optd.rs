@@ -24,7 +24,7 @@ use datafusion::{
 use optd_core::rel_node::RelNodeMetaMap;
 use optd_datafusion_repr::{
     plan_nodes::{
-        BetweenExpr, BinOpExpr, BinOpType, CastExpr, ColumnRefExpr, ConstantExpr, ConstantType,
+        BetweenExpr, BinOpExpr, BinOpType, LogOpExpr, LogOpType, CastExpr, ColumnRefExpr, ConstantExpr, ConstantType,
         Expr, FuncExpr, FuncType, InListExpr, JoinType, LikeExpr, OptRelNode, OptRelNodeRef,
         OptRelNodeTyp, PhysicalAgg, PhysicalEmptyRelation, PhysicalFilter, PhysicalHashJoin,
         PhysicalLimit, PhysicalNestedLoopJoin, PhysicalProjection, PhysicalScan, PhysicalSort,
@@ -196,6 +196,23 @@ impl OptdPlanContext<'_> {
                 }
             }
             OptRelNodeTyp::Sort => unreachable!(),
+            OptRelNodeTyp::LogOp(typ) => {
+                let expr = LogOpExpr::from_rel_node(expr.into_rel_node()).unwrap();
+                let mut children = expr.children().to_vec().into_iter();
+                let first_expr = Self::conv_from_optd_expr(children.next().unwrap(), context)?;
+                let op = match typ {
+                    LogOpType::And => datafusion::logical_expr::Operator::And,
+                    LogOpType::Or => datafusion::logical_expr::Operator::Or,
+                };
+                children.try_fold(first_expr, |acc, expr| {
+                    let expr = Self::conv_from_optd_expr(expr, context)?;
+                    Ok(
+                        Arc::new(datafusion::physical_plan::expressions::BinaryExpr::new(
+                            acc, op, expr,
+                        )) as Arc<dyn PhysicalExpr>,
+                    )
+                })
+            }
             OptRelNodeTyp::BinOp(op) => {
                 let expr = BinOpExpr::from_rel_node(expr.into_rel_node()).unwrap();
                 let left = Self::conv_from_optd_expr(expr.left_child(), context)?;

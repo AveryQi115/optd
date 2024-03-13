@@ -25,7 +25,7 @@ pub use agg::{LogicalAgg, PhysicalAgg};
 pub use apply::{ApplyType, LogicalApply};
 pub use empty_relation::{LogicalEmptyRelation, PhysicalEmptyRelation};
 pub use expr::{
-    BetweenExpr, BinOpExpr, BinOpType, CastExpr, ColumnRefExpr, ConstantExpr, ConstantType,
+    LogOpExpr, LogOpType, BetweenExpr, BinOpExpr, BinOpType, CastExpr, ColumnRefExpr, ConstantExpr, ConstantType,
     DataTypeExpr, ExprList, FuncExpr, FuncType, InListExpr, LikeExpr, SortOrderExpr, SortOrderType,
     UnOpExpr, UnOpType,
 };
@@ -69,6 +69,7 @@ pub enum OptRelNodeTyp {
     ColumnRef,
     UnOp(UnOpType),
     BinOp(BinOpType),
+    LogOp(LogOpType),
     Func(FuncType),
     SortOrder(SortOrderType),
     Between,
@@ -110,6 +111,7 @@ impl OptRelNodeTyp {
                 | Self::ColumnRef
                 | Self::UnOp(_)
                 | Self::BinOp(_)
+                | Self::LogOp(_)
                 | Self::Func(_)
                 | Self::SortOrder(_)
                 | Self::Between
@@ -369,6 +371,9 @@ pub fn explain(rel_node: OptRelNodeRef, meta_map: Option<&RelNodeMetaMap>) -> Pr
             .unwrap()
             .dispatch_explain(meta_map),
         OptRelNodeTyp::SortOrder(_) => SortOrderExpr::from_rel_node(rel_node)
+            .unwrap()
+            .dispatch_explain(meta_map),
+        OptRelNodeTyp::LogOp(_) => LogOpExpr::from_rel_node(rel_node)
             .unwrap()
             .dispatch_explain(meta_map),
         OptRelNodeTyp::PhysicalEmptyRelation => PhysicalEmptyRelation::from_rel_node(rel_node)
