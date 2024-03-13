@@ -14,7 +14,7 @@ use super::macros::define_rule;
 define_rule!(
     SimplifyFilterRule,
     apply_simplify_filter,
-    (Filter, _child, [cond])
+    (Filter, child, [cond])
 );
 
 fn simplify_log_expr(log_expr: OptRelNodeRef) -> OptRelNodeRef {
@@ -84,12 +84,17 @@ fn simplify_log_expr(log_expr: OptRelNodeRef) -> OptRelNodeRef {
 //    - Removes Duplicates
 fn apply_simplify_filter(
     _optimizer: &impl Optimizer<OptRelNodeTyp>,
-    SimplifyFilterRulePicks { _child, cond }: SimplifyFilterRulePicks,
+    SimplifyFilterRulePicks { child, cond }: SimplifyFilterRulePicks,
 ) -> Vec<RelNode<OptRelNodeTyp>> {
     match cond.typ {
         OptRelNodeTyp::LogOp(_) => {
             let new_log_expr = simplify_log_expr(Arc::new(cond));
-            vec![new_log_expr.as_ref().clone()]
+            let filter_node = RelNode {
+                typ: OptRelNodeTyp::Filter,
+                children: vec![child.into(), new_log_expr.into()],
+                data: None,
+            };
+            vec![filter_node]
         }
         _ => {
             vec![]
