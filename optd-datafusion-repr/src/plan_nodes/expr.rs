@@ -344,10 +344,6 @@ pub enum BinOpType {
     Lt,
     Geq,
     Leq,
-
-    // logical
-    And,
-    Or,
 }
 
 impl Display for BinOpType {
@@ -369,10 +365,6 @@ impl BinOpType {
             self,
             Self::Eq | Self::Neq | Self::Gt | Self::Lt | Self::Geq | Self::Leq
         )
-    }
-
-    pub fn is_logical(&self) -> bool {
-        matches!(self, Self::And | Self::Or)
     }
 }
 
