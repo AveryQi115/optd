@@ -542,7 +542,8 @@ impl OptCostModel {
 
         match log_op_typ {
             LogOpType::And => children_sel.product(),
-            LogOpType::Or => unimplemented!(),
+            // the formula is 1.0 - the probability of _none_ of the events happening
+            LogOpType::Or => 1.0 - children_sel.fold(1.0, |acc, sel| acc * (1.0 - sel)),
         }
     }
 
@@ -1169,35 +1170,41 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_or() {
-    //     let cost_model = create_one_column_cost_model(PerColumnStats::new(
-    //         Box::new(MockMostCommonValues {
-    //             mcvs: vec![(Value::Int32(1), 0.3), (Value::Int32(5), 0.5)]
-    //                 .into_iter()
-    //                 .collect(),
-    //         }),
-    //         0,
-    //         0.0,
-    //         Box::new(MockDistribution::empty()),
-    //     ));
-    //     let eq1 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(1)));
-    //     let eq5 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(5)));
-    //     let expr_tree = bin_op(BinOpType::Or, eq1.clone(), eq5.clone());
-    //     let expr_tree_rev = bin_op(BinOpType::Or, eq5.clone(), eq1.clone());
-    //     let column_refs = vec![ColumnRef::BaseTableColumnRef {
-    //         table: String::from(TABLE1_NAME),
-    //         col_idx: 0,
-    //     }];
-    //     assert_approx_eq::assert_approx_eq!(
-    //         cost_model.get_filter_selectivity(expr_tree, &column_refs),
-    //         0.65
-    //     );
-    //     assert_approx_eq::assert_approx_eq!(
-    //         cost_model.get_filter_selectivity(expr_tree_rev, &column_refs),
-    //         0.65
-    //     );
-    // }
+    #[test]
+    fn test_or() {
+        let cost_model = create_one_column_cost_model(PerColumnStats::new(
+            Box::new(MockMostCommonValues {
+                mcvs: vec![(Value::Int32(1), 0.3), (Value::Int32(5), 0.5), (Value::Int32(8), 0.2)]
+                    .into_iter()
+                    .collect(),
+            }),
+            0,
+            0.0,
+            Box::new(MockDistribution::empty()),
+        ));
+        let eq1 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(1)));
+        let eq5 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(5)));
+        let eq8 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(8)));
+        let expr_tree = log_op(LogOpType::Or, vec![eq1.clone(), eq5.clone(), eq8.clone()]);
+        let expr_tree_shift1 = log_op(LogOpType::Or, vec![eq5.clone(), eq8.clone(), eq1.clone()]);
+        let expr_tree_shift2 = log_op(LogOpType::Or, vec![eq8.clone(), eq1.clone(), eq5.clone()]);
+        let column_refs = vec![ColumnRef::BaseTableColumnRef {
+            table: String::from(TABLE1_NAME),
+            col_idx: 0,
+        }];
+        assert_approx_eq::assert_approx_eq!(
+            cost_model.get_filter_selectivity(expr_tree, &column_refs),
+            0.72
+        );
+        assert_approx_eq::assert_approx_eq!(
+            cost_model.get_filter_selectivity(expr_tree_shift1, &column_refs),
+            0.72
+        );
+        assert_approx_eq::assert_approx_eq!(
+            cost_model.get_filter_selectivity(expr_tree_shift2, &column_refs),
+            0.72
+        );
+    }
 
     #[test]
     fn test_not_no_nulls() {
