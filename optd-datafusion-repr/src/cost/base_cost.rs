@@ -305,11 +305,7 @@ impl OptCostModel {
                 }
             }
             OptRelNodeTyp::LogOp(log_op_typ) => {
-                self.get_log_op_selectivity(
-                    log_op_typ,
-                    &expr_tree.children,
-                    column_refs,
-                )
+                self.get_log_op_selectivity(log_op_typ, &expr_tree.children, column_refs)
             }
             OptRelNodeTyp::UnOp(un_op_typ) => {
                 assert!(expr_tree.children.len() == 1);
@@ -538,7 +534,9 @@ impl OptCostModel {
         children: &Vec<OptRelNodeRef>,
         column_refs: &GroupColumnRefs,
     ) -> f64 {
-        let children_sel = children.iter().map(|expr| self.get_filter_selectivity(expr.clone(), column_refs));
+        let children_sel = children
+            .iter()
+            .map(|expr| self.get_filter_selectivity(expr.clone(), column_refs));
 
         match log_op_typ {
             LogOpType::And => children_sel.product(),
@@ -589,7 +587,8 @@ mod tests {
 
     use crate::{
         plan_nodes::{
-            BinOpExpr, BinOpType, ColumnRefExpr, ConstantExpr, Expr, ExprList, LogOpExpr, LogOpType, OptRelNode, OptRelNodeRef, UnOpExpr, UnOpType
+            BinOpExpr, BinOpType, ColumnRefExpr, ConstantExpr, Expr, ExprList, LogOpExpr,
+            LogOpType, OptRelNode, OptRelNodeRef, UnOpExpr, UnOpType,
         },
         properties::column_ref::ColumnRef,
     };
@@ -693,9 +692,15 @@ mod tests {
         LogOpExpr::new(
             op_type,
             ExprList::new(
-                children.into_iter().map(|opt_rel_node_ref| Expr::from_rel_node(opt_rel_node_ref).expect("all children should be Expr")).collect()
-            )
-        ).into_rel_node()
+                children
+                    .into_iter()
+                    .map(|opt_rel_node_ref| {
+                        Expr::from_rel_node(opt_rel_node_ref).expect("all children should be Expr")
+                    })
+                    .collect(),
+            ),
+        )
+        .into_rel_node()
     }
 
     fn un_op(op_type: UnOpType, child: OptRelNodeRef) -> OptRelNodeRef {
@@ -1138,9 +1143,13 @@ mod tests {
     fn test_and() {
         let cost_model = create_one_column_cost_model(PerColumnStats::new(
             Box::new(MockMostCommonValues {
-                mcvs: vec![(Value::Int32(1), 0.3), (Value::Int32(5), 0.5), (Value::Int32(8), 0.2)]
-                    .into_iter()
-                    .collect(),
+                mcvs: vec![
+                    (Value::Int32(1), 0.3),
+                    (Value::Int32(5), 0.5),
+                    (Value::Int32(8), 0.2),
+                ]
+                .into_iter()
+                .collect(),
             }),
             0,
             0.0,
@@ -1174,9 +1183,13 @@ mod tests {
     fn test_or() {
         let cost_model = create_one_column_cost_model(PerColumnStats::new(
             Box::new(MockMostCommonValues {
-                mcvs: vec![(Value::Int32(1), 0.3), (Value::Int32(5), 0.5), (Value::Int32(8), 0.2)]
-                    .into_iter()
-                    .collect(),
+                mcvs: vec![
+                    (Value::Int32(1), 0.3),
+                    (Value::Int32(5), 0.5),
+                    (Value::Int32(8), 0.2),
+                ]
+                .into_iter()
+                .collect(),
             }),
             0,
             0.0,

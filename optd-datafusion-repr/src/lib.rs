@@ -164,7 +164,7 @@ impl DatafusionOptimizer {
         root_rel: OptRelNodeRef,
     ) -> Result<(GroupId, OptRelNodeRef, RelNodeMetaMap)> {
         println!("optimize(): root_rel={}", root_rel);
-        
+
         if self.enable_adaptive {
             self.runtime_statistics.lock().unwrap().iter_cnt += 1;
             self.optimizer.step_clear_winner();
