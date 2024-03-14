@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::plan_nodes::{BinOpType, ColumnRefExpr, OptRelNode, UnOpType};
+use crate::plan_nodes::{BinOpType, ColumnRefExpr, LogOpType, OptRelNode, UnOpType};
 use crate::properties::column_ref::{ColumnRefPropertyBuilder, GroupColumnRefs};
 use crate::{
     plan_nodes::{OptRelNodeRef, OptRelNodeTyp},
@@ -304,6 +304,13 @@ impl OptCostModel {
                     unreachable!("all BinOpTypes should be true for at least one is_*() function")
                 }
             }
+            OptRelNodeTyp::LogOp(log_op_typ) => {
+                self.get_log_op_selectivity(
+                    log_op_typ,
+                    &expr_tree.children,
+                    column_refs,
+                )
+            }
             OptRelNodeTyp::UnOp(un_op_typ) => {
                 assert!(expr_tree.children.len() == 1);
                 let child = expr_tree.child(0);
@@ -525,26 +532,19 @@ impl OptCostModel {
         }
     }
 
-    // fn get_logical_bin_op_selectivity(
-    //     &self,
-    //     bin_op_typ: BinOpType,
-    //     left: OptRelNodeRef,
-    //     right: OptRelNodeRef,
-    //     column_refs: &GroupColumnRefs,
-    // ) -> f64 {
-    //     assert!(bin_op_typ.is_logical());
+    fn get_log_op_selectivity(
+        &self,
+        log_op_typ: LogOpType,
+        children: &Vec<OptRelNodeRef>,
+        column_refs: &GroupColumnRefs,
+    ) -> f64 {
+        let children_sel = children.iter().map(|expr| self.get_filter_selectivity(expr.clone(), column_refs));
 
-    //     let left_sel = self.get_filter_selectivity(left, column_refs);
-    //     let right_sel = self.get_filter_selectivity(right, column_refs);
-
-    //     match bin_op_typ {
-    //         // note that there's no need to account for nulls here
-    //         // it's also impossible to even account for nulls because we don't know which columns the left and right selectivities are
-    //         BinOpType::And => left_sel * right_sel,
-    //         BinOpType::Or => left_sel + right_sel - left_sel * right_sel,
-    //         _ => unreachable!("we covered all bin_op_typ.is_logical() cases"),
-    //     }
-    // }
+        match log_op_typ {
+            LogOpType::And => children_sel.product(),
+            LogOpType::Or => unimplemented!(),
+        }
+    }
 
     pub fn get_row_cnt(&self, table: &str) -> Option<usize> {
         self.per_table_stats_map
@@ -588,8 +588,7 @@ mod tests {
 
     use crate::{
         plan_nodes::{
-            BinOpExpr, BinOpType, ColumnRefExpr, ConstantExpr, Expr, OptRelNode, OptRelNodeRef,
-            UnOpExpr, UnOpType,
+            BinOpExpr, BinOpType, ColumnRefExpr, ConstantExpr, Expr, ExprList, LogOpExpr, LogOpType, OptRelNode, OptRelNodeRef, UnOpExpr, UnOpType
         },
         properties::column_ref::ColumnRef,
     };
@@ -687,6 +686,15 @@ mod tests {
             op_type,
         )
         .into_rel_node()
+    }
+
+    fn log_op(op_type: LogOpType, children: Vec<OptRelNodeRef>) -> OptRelNodeRef {
+        LogOpExpr::new(
+            op_type,
+            ExprList::new(
+                children.into_iter().map(|opt_rel_node_ref| Expr::from_rel_node(opt_rel_node_ref).expect("all children should be Expr")).collect()
+            )
+        ).into_rel_node()
     }
 
     fn un_op(op_type: UnOpType, child: OptRelNodeRef) -> OptRelNodeRef {
@@ -1125,35 +1133,41 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_and() {
-    //     let cost_model = create_one_column_cost_model(PerColumnStats::new(
-    //         Box::new(MockMostCommonValues {
-    //             mcvs: vec![(Value::Int32(1), 0.3), (Value::Int32(5), 0.5)]
-    //                 .into_iter()
-    //                 .collect(),
-    //         }),
-    //         0,
-    //         0.0,
-    //         Box::new(MockDistribution::empty()),
-    //     ));
-    //     let eq1 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(1)));
-    //     let eq5 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(5)));
-    //     let expr_tree = bin_op(BinOpType::And, eq1.clone(), eq5.clone());
-    //     let expr_tree_rev = bin_op(BinOpType::And, eq5.clone(), eq1.clone());
-    //     let column_refs = vec![ColumnRef::BaseTableColumnRef {
-    //         table: String::from(TABLE1_NAME),
-    //         col_idx: 0,
-    //     }];
-    //     assert_approx_eq::assert_approx_eq!(
-    //         cost_model.get_filter_selectivity(expr_tree, &column_refs),
-    //         0.15
-    //     );
-    //     assert_approx_eq::assert_approx_eq!(
-    //         cost_model.get_filter_selectivity(expr_tree_rev, &column_refs),
-    //         0.15
-    //     );
-    // }
+    #[test]
+    fn test_and() {
+        let cost_model = create_one_column_cost_model(PerColumnStats::new(
+            Box::new(MockMostCommonValues {
+                mcvs: vec![(Value::Int32(1), 0.3), (Value::Int32(5), 0.5), (Value::Int32(8), 0.2)]
+                    .into_iter()
+                    .collect(),
+            }),
+            0,
+            0.0,
+            Box::new(MockDistribution::empty()),
+        ));
+        let eq1 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(1)));
+        let eq5 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(5)));
+        let eq8 = bin_op(BinOpType::Eq, col_ref(0), cnst(Value::Int32(8)));
+        let expr_tree = log_op(LogOpType::And, vec![eq1.clone(), eq5.clone(), eq8.clone()]);
+        let expr_tree_shift1 = log_op(LogOpType::And, vec![eq5.clone(), eq8.clone(), eq1.clone()]);
+        let expr_tree_shift2 = log_op(LogOpType::And, vec![eq8.clone(), eq1.clone(), eq5.clone()]);
+        let column_refs = vec![ColumnRef::BaseTableColumnRef {
+            table: String::from(TABLE1_NAME),
+            col_idx: 0,
+        }];
+        assert_approx_eq::assert_approx_eq!(
+            cost_model.get_filter_selectivity(expr_tree, &column_refs),
+            0.03
+        );
+        assert_approx_eq::assert_approx_eq!(
+            cost_model.get_filter_selectivity(expr_tree_shift1, &column_refs),
+            0.03
+        );
+        assert_approx_eq::assert_approx_eq!(
+            cost_model.get_filter_selectivity(expr_tree_shift2, &column_refs),
+            0.03
+        );
+    }
 
     // #[test]
     // fn test_or() {
