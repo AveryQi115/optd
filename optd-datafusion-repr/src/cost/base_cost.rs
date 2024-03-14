@@ -531,7 +531,7 @@ impl OptCostModel {
     fn get_log_op_selectivity(
         &self,
         log_op_typ: LogOpType,
-        children: &Vec<OptRelNodeRef>,
+        children: &[OptRelNodeRef],
         column_refs: &GroupColumnRefs,
     ) -> f64 {
         let children_sel = children
