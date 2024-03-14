@@ -17,20 +17,22 @@ define_rule!(
     (Filter, child, [cond])
 );
 
-fn simplify_log_expr(log_expr: OptRelNodeRef) -> OptRelNodeRef {
+fn simplify_log_expr(log_expr: OptRelNodeRef, changed: &mut bool) -> OptRelNodeRef {
     let log_expr = LogOpExpr::from_rel_node(log_expr).unwrap();
     let op = log_expr.op_type();
     let mut new_children = HashSet::new();
+    let children_size = log_expr.children().len();
     for child in log_expr.children() {
         let mut new_child = child;
         if let OptRelNodeTyp::LogOp(_) = new_child.typ() {
-            let new_expr = simplify_log_expr(new_child.into_rel_node().clone());
+            let new_expr = simplify_log_expr(new_child.into_rel_node().clone(), changed);
             new_child = Expr::from_rel_node(new_expr).unwrap();
         }
         if let OptRelNodeTyp::Constant(ConstantType::Bool) = new_child.typ() {
             let data = new_child.into_rel_node().data.clone().unwrap();
             // TrueExpr
             if data.as_bool() {
+                *changed = true;
                 if op == LogOpType::And {
                     // skip True in And
                     continue;
@@ -65,12 +67,16 @@ fn simplify_log_expr(log_expr: OptRelNodeRef) -> OptRelNodeRef {
         unreachable!("no other type in logOp");
     }
     if new_children.len() == 1 {
+        *changed = true;
         return new_children
             .into_iter()
             .next()
             .unwrap()
             .into_rel_node()
             .clone();
+    }
+    if children_size != new_children.len() {
+        *changed = true;
     }
     LogOpExpr::new(op, ExprList::new(new_children.into_iter().collect()))
         .into_rel_node()
@@ -88,13 +94,17 @@ fn apply_simplify_filter(
 ) -> Vec<RelNode<OptRelNodeTyp>> {
     match cond.typ {
         OptRelNodeTyp::LogOp(_) => {
-            let new_log_expr = simplify_log_expr(Arc::new(cond));
-            let filter_node = RelNode {
-                typ: OptRelNodeTyp::Filter,
-                children: vec![child.into(), new_log_expr],
-                data: None,
-            };
-            vec![filter_node]
+            let mut changed = false;
+            let new_log_expr = simplify_log_expr(Arc::new(cond), &mut changed);
+            if changed {
+                let filter_node = RelNode {
+                    typ: OptRelNodeTyp::Filter,
+                    children: vec![child.into(), new_log_expr],
+                    data: None,
+                };
+                return vec![filter_node];
+            }
+            vec![]
         }
         _ => {
             vec![]
