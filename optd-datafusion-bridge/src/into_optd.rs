@@ -15,6 +15,11 @@ use optd_datafusion_repr::plan_nodes::{
 
 use crate::OptdPlanContext;
 
+// flatten_nested_logical is a helper function to flatten nested logical operators with same op type
+// eg. (a AND (b AND c)) => ExprList([a, b, c])
+//    (a OR (b OR c)) => ExprList([a, b, c])
+// It assume the children of the input expr_list are already flattened
+//  and can only be used in bottom up manner
 fn flatten_nested_logical(op: LogOpType, expr_list: ExprList) -> ExprList {
     // conv_into_optd_expr is building the children bottom up so there is no need to
     // call flatten_nested_logical recursively

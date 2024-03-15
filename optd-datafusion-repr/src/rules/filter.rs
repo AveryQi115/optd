@@ -17,6 +17,11 @@ define_rule!(
     (Filter, child, [cond])
 );
 
+// simplify_log_expr simplifies the Filters operator in several possible
+//  ways:
+//    - Replaces the Or operator with True if any operand is True
+//    - Replaces the And operator with False if any operand is False
+//    - Removes Duplicates
 fn simplify_log_expr(log_expr: OptRelNodeRef, changed: &mut bool) -> OptRelNodeRef {
     let log_expr = LogOpExpr::from_rel_node(log_expr).unwrap();
     let op = log_expr.op_type();
