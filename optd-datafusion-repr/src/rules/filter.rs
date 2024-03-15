@@ -30,9 +30,9 @@ fn simplify_log_expr(log_expr: OptRelNodeRef, changed: &mut bool) -> OptRelNodeR
         }
         if let OptRelNodeTyp::Constant(ConstantType::Bool) = new_child.typ() {
             let data = new_child.into_rel_node().data.clone().unwrap();
+            *changed = true;
             // TrueExpr
             if data.as_bool() {
-                *changed = true;
                 if op == LogOpType::And {
                     // skip True in And
                     continue;
