@@ -6,6 +6,7 @@ use postgres_db::PostgresDb;
 
 use crate::{
     benchmark::Benchmark,
+    datafusion_db_cardtest::DatafusionDb,
     tpch::{TpchConfig, TPCH_KIT_POSTGRES},
 };
 
@@ -37,6 +38,9 @@ enum Commands {
         #[arg(long)]
         #[clap(default_value = "15721")]
         seed: i32,
+        #[arg(long)]
+        #[clap(value_delimiter = ' ', num_args = 1..)]
+        query_ids: Vec<u32>,
     },
 }
 
@@ -50,24 +54,30 @@ async fn main() -> anyhow::Result<()> {
         fs::create_dir(&workspace_dpath)?;
     }
 
-    match &cli.command {
-        Commands::Cardtest { scale_factor, seed } => {
+    match cli.command {
+        Commands::Cardtest {
+            scale_factor,
+            seed,
+            query_ids,
+        } => {
             let tpch_config = TpchConfig {
                 database: String::from(TPCH_KIT_POSTGRES),
-                scale_factor: *scale_factor,
-                seed: *seed,
+                scale_factor,
+                seed,
+                query_ids,
             };
             cardtest(&workspace_dpath, tpch_config).await
         }
     }
 }
 
-async fn cardtest<P: AsRef<Path>>(
+async fn cardtest<P: AsRef<Path> + Clone>(
     workspace_dpath: P,
     tpch_config: TpchConfig,
 ) -> anyhow::Result<()> {
-    let pg_db = PostgresDb::build(workspace_dpath).await?;
-    let databases: Vec<Box<dyn CardtestRunnerDBHelper>> = vec![Box::new(pg_db)];
+    let pg_db = PostgresDb::new(workspace_dpath.clone());
+    let df_db = DatafusionDb::new(workspace_dpath).await?;
+    let databases: Vec<Box<dyn CardtestRunnerDBHelper>> = vec![Box::new(pg_db), Box::new(df_db)];
 
     let tpch_benchmark = Benchmark::Tpch(tpch_config.clone());
     let mut cardtest_runner = CardtestRunner::new(databases).await?;
