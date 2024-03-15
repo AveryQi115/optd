@@ -20,7 +20,9 @@ define_rule!(
 fn simplify_log_expr(log_expr: OptRelNodeRef, changed: &mut bool) -> OptRelNodeRef {
     let log_expr = LogOpExpr::from_rel_node(log_expr).unwrap();
     let op = log_expr.op_type();
-    let mut new_children = HashSet::new();
+    // we need a new children vec to output deterministic order
+    let mut new_children_set = HashSet::new();
+    let mut new_children = Vec::new();
     let children_size = log_expr.children().len();
     for child in log_expr.children() {
         let mut new_child = child;
@@ -53,8 +55,9 @@ fn simplify_log_expr(log_expr: OptRelNodeRef, changed: &mut bool) -> OptRelNodeR
                 continue;
             }
             unreachable!("no other type in logOp");
-        } else {
-            new_children.insert(new_child);
+        } else if !new_children_set.contains(&new_child) {
+            new_children_set.insert(new_child.clone());
+            new_children.push(new_child);
         }
     }
     if new_children.is_empty() {
@@ -78,7 +81,7 @@ fn simplify_log_expr(log_expr: OptRelNodeRef, changed: &mut bool) -> OptRelNodeR
     if children_size != new_children.len() {
         *changed = true;
     }
-    LogOpExpr::new(op, ExprList::new(new_children.into_iter().collect()))
+    LogOpExpr::new(op, ExprList::new(new_children))
         .into_rel_node()
         .clone()
 }
