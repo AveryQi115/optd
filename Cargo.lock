@@ -2714,12 +2714,14 @@ name = "optd-perftest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "assert_cmd",
  "async-trait",
  "clap 4.5.2",
  "datafusion",
  "datafusion-optd-cli",
  "env_logger 0.11.2",
  "futures",
+ "futures-util",
  "lazy_static",
  "log",
  "optd-datafusion-bridge",
@@ -2728,6 +2730,7 @@ dependencies = [
  "shlex",
  "tokio",
  "tokio-postgres",
+ "tokio-util",
 ]
 
 [[package]]
