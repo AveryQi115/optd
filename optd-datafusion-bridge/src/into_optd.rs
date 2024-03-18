@@ -330,6 +330,8 @@ impl OptdPlanContext<'_> {
             Ok(LogicalJoin::new(left, right, log_ops.remove(0), join_type))
         } else {
             let expr_list = ExprList::new(log_ops);
+            // the expr from filter is already flattened in conv_into_optd_expr
+            let expr_list = flatten_nested_logical(LogOpType::And, expr_list);
             Ok(LogicalJoin::new(
                 left,
                 right,
