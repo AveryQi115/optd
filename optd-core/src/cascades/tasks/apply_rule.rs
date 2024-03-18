@@ -196,7 +196,6 @@ impl<T: RelNodeTyp> Task<T> for ApplyRuleTask {
         let mut tasks = vec![];
         let binding_exprs = match_and_pick_expr(rule.matcher(), self.expr_id, optimizer);
         for expr in binding_exprs {
-            // println!("apply_rule: expr_id = {}, group_id = {}, rule_id = {}, original expr = {:?}", self.expr_id, group_id, self.rule_id, expr);
             let applied = rule.apply(optimizer, expr);
 
             if rule_wrapper.optimize_type() == OptimizeType::Heuristics {
@@ -208,7 +207,6 @@ impl<T: RelNodeTyp> Task<T> for ApplyRuleTask {
                 if applied.is_empty() {
                     continue;
                 }
-                println!("apply_rule: expr_id = {}, group_id = {}, rule_id = {}, applied[0] = {}", self.expr_id, group_id, self.rule_id, applied[0]);
 
                 let RelNode { typ, .. } = &applied[0];
 

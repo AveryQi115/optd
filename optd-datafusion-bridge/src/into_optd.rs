@@ -4,7 +4,6 @@ use datafusion::{
     logical_expr::{self, logical_plan, LogicalPlan, Operator},
     scalar::ScalarValue,
 };
-use datafusion_expr::Expr as DFExpr;
 use optd_core::rel_node::RelNode;
 use optd_datafusion_repr::plan_nodes::{
     BetweenExpr, BinOpExpr, BinOpType, CastExpr, ColumnRefExpr, ConstantExpr, Expr, ExprList,
@@ -314,8 +313,9 @@ impl OptdPlanContext<'_> {
             let expr = BinOpExpr::new(left, right, op).into_expr();
             log_ops.push(expr);
         }
-        if node.filter != None{
-            let filter = self.conv_into_optd_expr(node.filter.as_ref().unwrap(), node.schema.as_ref())?;
+        if node.filter.is_some() {
+            let filter =
+                self.conv_into_optd_expr(node.filter.as_ref().unwrap(), node.schema.as_ref())?;
             log_ops.push(filter);
         }
 
