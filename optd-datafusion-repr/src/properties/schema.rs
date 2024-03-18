@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use optd_core::property::PropertyBuilder;
 
-use crate::plan_nodes::{ConstantType, EmptyRelationData, OptRelNodeTyp};
 use super::DEFAULT_NAME;
+use crate::plan_nodes::{ConstantType, EmptyRelationData, OptRelNodeTyp};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Field {

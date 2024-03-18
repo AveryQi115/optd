@@ -7,7 +7,6 @@ use crate::plan_nodes::{EmptyRelationData, OptRelNodeTyp};
 use super::schema::Catalog;
 use super::DEFAULT_NAME;
 
-
 #[derive(Clone, Debug)]
 pub enum ColumnRef {
     BaseTableColumnRef { table: String, col_idx: usize },
