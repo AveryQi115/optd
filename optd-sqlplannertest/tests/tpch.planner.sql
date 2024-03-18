@@ -1937,9 +1937,13 @@ LogicalProjection
     └── LogicalProjection { exprs: [ #1 ] }
         └── LogicalJoin
             ├── join_type: Inner
-            ├── cond:Eq
-            │   ├── #2
-            │   └── #4
+            ├── cond:And
+            │   ├── Eq
+            │   │   ├── #2
+            │   │   └── #4
+            │   └── Lt
+            │       ├── Cast { cast_to: Decimal128(30, 15), expr: #0 }
+            │       └── #3
             ├── LogicalProjection { exprs: [ #1, #2, #3 ] }
             │   └── LogicalJoin
             │       ├── join_type: Inner
@@ -1986,7 +1990,15 @@ PhysicalProjection
     │   └── [ #0 ]
     ├── groups: []
     └── PhysicalProjection { exprs: [ #1 ] }
-        └── PhysicalHashJoin { join_type: Inner, left_keys: [ #2 ], right_keys: [ #1 ] }
+        └── PhysicalNestedLoopJoin
+            ├── join_type: Inner
+            ├── cond:And
+            │   ├── Eq
+            │   │   ├── #2
+            │   │   └── #4
+            │   └── Lt
+            │       ├── Cast { cast_to: Decimal128(30, 15), expr: #0 }
+            │       └── #3
             ├── PhysicalProjection { exprs: [ #1, #2, #3 ] }
             │   └── PhysicalHashJoin { join_type: Inner, left_keys: [ #0 ], right_keys: [ #0 ] }
             │       ├── PhysicalProjection { exprs: [ #1, #4, #5 ] }

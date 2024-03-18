@@ -114,6 +114,9 @@ impl<T: RelNodeTyp> Memo<T> {
         group_a: ReducedGroupId,
         group_b: ReducedGroupId,
     ) -> ReducedGroupId {
+        if group_a == ReducedGroupId(29) || group_b == ReducedGroupId(29){
+            print!("merge_group: group_a_reduced={}, group_b_reduced={}\n\n", group_a, group_b);
+        }
         if group_a == group_b {
             return group_a;
         }
@@ -168,6 +171,9 @@ impl<T: RelNodeTyp> Memo<T> {
             rel_node,
             add_to_group_id.map(|x| self.get_reduced_group_id(x)),
         );
+        if expr_id == ExprId(28){
+            print!("add_new_group_expr: group_id={}, add_to_group_id={:?}\n\n", group_id, add_to_group_id);
+        }
         (group_id.as_group_id(), expr_id)
     }
 
@@ -258,10 +264,25 @@ impl<T: RelNodeTyp> Memo<T> {
         replace_group_id: GroupId,
         rel_node: RelNodeRef<T>,
     ) -> bool {
+        if expr_id == ExprId(28){
+            print!("replace_group_expr: group_id={}, rel_node={}", replace_group_id, rel_node);
+        }
         let replace_group_id = self.get_reduced_group_id(replace_group_id);
+        if expr_id == ExprId(28){
+            print!(" reduced group_id = {}\n\n", replace_group_id);
+        }
 
         if let Entry::Occupied(mut entry) = self.groups.entry(replace_group_id) {
             let group = entry.get_mut();
+            if expr_id == ExprId(28){
+                print!("group_exprs = [ ");
+                for id in &group.group_exprs{
+                    print!("{},", id);
+                }
+                print!("]\n ");
+
+                print!("original expr={}\n\n", self.expr_id_to_expr_node[&expr_id]);
+            }
             if !group.group_exprs.contains(&expr_id) {
                 unreachable!("expr not found in group in replace_group_expr");
             }
@@ -285,8 +306,8 @@ impl<T: RelNodeTyp> Memo<T> {
             };
 
             // if the new expr already in the memo table, merge the group and remove old expr
-            if let Some(&expr_id) = self.expr_node_to_expr_id.get(&memo_node) {
-                let group_id = self.get_group_id_of_expr_id(expr_id);
+            if let Some(&exist_expr_id) = self.expr_node_to_expr_id.get(&memo_node) {
+                let group_id = self.get_group_id_of_expr_id(exist_expr_id);
                 let group_id = self.get_reduced_group_id(group_id);
                 self.merge_group_inner(replace_group_id, group_id);
 
@@ -355,7 +376,14 @@ impl<T: RelNodeTyp> Memo<T> {
             .expr_id_to_group_id
             .get(&expr_id)
             .expect("expr not found in group mapping");
-        self.get_reduced_group_id(*group_id).as_group_id()
+        if expr_id == ExprId(28){
+            print!("get_group_id: group_id={}", group_id);
+        }
+        let reduced_group_id = self.get_reduced_group_id(*group_id);
+        if expr_id == ExprId(28){
+            print!(" reduced_group_id={}\n\n", reduced_group_id);
+        }
+        reduced_group_id.as_group_id()
     }
 
     /// Get the memoized representation of a node.
