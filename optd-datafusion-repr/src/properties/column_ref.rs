@@ -5,6 +5,8 @@ use optd_core::property::PropertyBuilder;
 use crate::plan_nodes::{EmptyRelationData, OptRelNodeTyp};
 
 use super::schema::Catalog;
+use super::DEFAULT_NAME;
+
 
 #[derive(Clone, Debug)]
 pub enum ColumnRef {
@@ -63,7 +65,7 @@ impl PropertyBuilder<OptRelNodeTyp> for ColumnRefPropertyBuilder {
                 let column_cnt = schema.fields.len();
                 (0..column_cnt)
                     .map(|i| ColumnRef::BaseTableColumnRef {
-                        table: "unnamed".to_string(),
+                        table: DEFAULT_NAME.to_string(),
                         col_idx: i,
                     })
                     .collect()

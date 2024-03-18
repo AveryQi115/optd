@@ -4,6 +4,7 @@ use std::sync::Arc;
 use optd_core::property::PropertyBuilder;
 
 use crate::plan_nodes::{ConstantType, EmptyRelationData, OptRelNodeTyp};
+use super::DEFAULT_NAME;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Field {
@@ -72,7 +73,7 @@ impl PropertyBuilder<OptRelNodeTyp> for SchemaPropertyBuilder {
                 let data_typ = ConstantType::get_data_type_from_value(&data.unwrap());
                 Schema {
                     fields: vec![Field {
-                        name: "unnamed".to_string(),
+                        name: DEFAULT_NAME.to_string(),
                         typ: data_typ,
                         nullable: true,
                     }],
@@ -88,7 +89,7 @@ impl PropertyBuilder<OptRelNodeTyp> for SchemaPropertyBuilder {
             OptRelNodeTyp::LogOp(_) => Schema {
                 fields: vec![
                     Field {
-                        name: "unnamed".to_string(),
+                        name: DEFAULT_NAME.to_string(),
                         typ: ConstantType::Any,
                         nullable: true
                     };
