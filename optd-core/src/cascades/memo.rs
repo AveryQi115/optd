@@ -262,7 +262,6 @@ impl<T: RelNodeTyp> Memo<T> {
 
         if let Entry::Occupied(mut entry) = self.groups.entry(replace_group_id) {
             let group = entry.get_mut();
-
             if !group.group_exprs.contains(&expr_id) {
                 unreachable!("expr not found in group in replace_group_expr");
             }
@@ -286,8 +285,8 @@ impl<T: RelNodeTyp> Memo<T> {
             };
 
             // if the new expr already in the memo table, merge the group and remove old expr
-            if let Some(&exist_expr_id) = self.expr_node_to_expr_id.get(&memo_node) {
-                let group_id = self.get_group_id_of_expr_id(exist_expr_id);
+            if let Some(&expr_id) = self.expr_node_to_expr_id.get(&memo_node) {
+                let group_id = self.get_group_id_of_expr_id(expr_id);
                 let group_id = self.get_reduced_group_id(group_id);
                 self.merge_group_inner(replace_group_id, group_id);
 
@@ -356,9 +355,7 @@ impl<T: RelNodeTyp> Memo<T> {
             .expr_id_to_group_id
             .get(&expr_id)
             .expect("expr not found in group mapping");
-
-        let reduced_group_id = self.get_reduced_group_id(*group_id);
-        reduced_group_id.as_group_id()
+        self.get_reduced_group_id(*group_id).as_group_id()
     }
 
     /// Get the memoized representation of a node.
