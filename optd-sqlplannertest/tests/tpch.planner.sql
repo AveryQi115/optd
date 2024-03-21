@@ -364,15 +364,7 @@ PhysicalLimit { skip: 0, fetch: 100 }
     │   └── SortOrder { order: Asc }
     │       └── #3
     └── PhysicalProjection { exprs: [ #5, #2, #8, #0, #1, #3, #4, #6 ] }
-        └── PhysicalNestedLoopJoin
-            ├── join_type: Inner
-            ├── cond:And
-            │   ├── Eq
-            │   │   ├── #0
-            │   │   └── #10
-            │   └── Eq
-            │       ├── #7
-            │       └── #9
+        └── PhysicalHashJoin { join_type: Inner, left_keys: [ #0, #7 ], right_keys: [ #1, #0 ] }
             ├── PhysicalProjection { exprs: [ #0, #1, #2, #3, #4, #5, #6, #7, #8 ] }
             │   └── PhysicalHashJoin { join_type: Inner, left_keys: [ #9 ], right_keys: [ #0 ] }
             │       ├── PhysicalProjection { exprs: [ #0, #1, #2, #3, #5, #6, #7, #8, #10, #11 ] }
