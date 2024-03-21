@@ -219,15 +219,7 @@ LogicalProjection { exprs: [ #0, #1, #2, #3 ] }
     ├── LogicalScan { table: t1 }
     └── LogicalScan { table: t2 }
 PhysicalProjection { exprs: [ #0, #1, #2, #3 ] }
-└── PhysicalNestedLoopJoin
-    ├── join_type: Inner
-    ├── cond:And
-    │   ├── Eq
-    │   │   ├── #0
-    │   │   └── #2
-    │   └── Eq
-    │       ├── #0
-    │       └── #3
+└── PhysicalHashJoin { join_type: Inner, left_keys: [ #0, #0 ], right_keys: [ #0, #1 ] }
     ├── PhysicalScan { table: t1 }
     └── PhysicalScan { table: t2 }
 */

@@ -1995,7 +1995,7 @@ PhysicalProjection
             ├── cond:And
             │   ├── Eq
             │   │   ├── #2
-            │   │   └── #4
+            │   │   └── #0
             │   └── Lt
             │       ├── Cast { cast_to: Decimal128(30, 15), expr: #0 }
             │       └── #3
