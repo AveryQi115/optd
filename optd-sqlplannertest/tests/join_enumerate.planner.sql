@@ -5,6 +5,7 @@ create table t3(t3v2 int, t3v4 int);
 insert into t1 values (0, 0), (1, 1), (2, 2);
 insert into t2 values (0, 200), (1, 201), (2, 202);
 insert into t3 values (0, 300), (1, 301), (2, 302);
+select t1v1 from (select t1v1 from(select t1v1 from t1));
 
 /*
 3

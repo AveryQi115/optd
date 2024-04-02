@@ -286,12 +286,16 @@ impl<T: RelNodeTyp> Memo<T> {
 
             // if the new expr already in the memo table, merge the group and remove old expr
             if let Some(&new_expr_id) = self.expr_node_to_expr_id.get(&memo_node) {
-                if new_expr_id == expr_id {
-                    unreachable!("It cannot be exactly the same!");
-                }
+                // println!("expr_id = {:?}, new_expr_id = {:?}, new_expr = {:?} expr = {:?}", expr_id, new_expr_id, memo_node, self.expr_id_to_expr_node.get(&expr_id));
                 let group_id = self.get_group_id_of_expr_id(new_expr_id);
                 let group_id = self.get_reduced_group_id(group_id);
                 self.merge_group_inner(replace_group_id, group_id);
+                // println!("merge group {:?} to {:?}", replace_group_id, group_id);
+                // if group_id == ReducedGroupId(7) {
+                //     for e in self.groups[&group_id].group_exprs.iter() {
+                //         println!("expr {:?}", e);
+                //     }
+                // }
 
                 // TODO: instead of remove this expr from the old group,
                 // we mark the expr as all rules have been fired to make it a dead end
@@ -470,6 +474,15 @@ impl<T: RelNodeTyp> Memo<T> {
     }
 
     pub fn get_group_info(&self, group_id: GroupId) -> GroupInfo {
+        // if group_id == GroupId(11) {
+        //     let reduced_group_id = self.get_reduced_group_id(group_id);
+        //     println!("reduced_group_id = {:?}", reduced_group_id);
+        //     let info = self.groups.get(&reduced_group_id).unwrap().info.clone();
+        //     println!("info = {:?}", info);
+        //     for expr in self.get_all_exprs_in_group(group_id) {
+        //         println!("expr_id = {:?}, expr = {:?}", expr, self.get_expr_memoed(expr));
+        //     }
+        // }
         self.groups
             .get(&self.get_reduced_group_id(group_id))
             .as_ref()
