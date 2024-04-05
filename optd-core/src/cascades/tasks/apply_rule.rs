@@ -179,9 +179,6 @@ impl<T: RelNodeTyp> Task<T> for ApplyRuleTask {
     }
 
     fn execute(&self, optimizer: &mut CascadesOptimizer<T>) -> Result<Vec<Box<dyn Task<T>>>> {
-        if self.expr_id == ExprId(6) {
-            println!("apply rule task for expr_id = 6, rule_id = {}, rule_name={}, exploring={}, group_id = {}", self.rule_id, optimizer.rules()[self.rule_id].rule().name(), self.exploring, optimizer.get_group_id(self.expr_id));
-        }
         if optimizer.is_rule_fired(self.expr_id, self.rule_id) {
             return Ok(vec![]);
         }
@@ -195,7 +192,7 @@ impl<T: RelNodeTyp> Task<T> for ApplyRuleTask {
         let rule = rule_wrapper.rule();
         
         // print!("event=task_begin, task=apply_rule, expr_id={}, rule_id={}, rule={}, optimize_type={}\n", self.expr_id, self.rule_id, rule.name(), rule_wrapper.optimize_type());
-        trace!(event = "task_begin", task = "apply_rule", expr_id = %self.expr_id, rule_id = %self.rule_id, rule = %rule.name(), optimize_type=%rule_wrapper.optimize_type());
+        trace!(event = "task_begin", task = "apply_rule", expr_id = %self.expr_id, rule_id = %self.rule_id, rule = %rule.name(), optimize_type=%rule_wrapper.optimize_type(), exploring=%self.exploring);
         let group_id = optimizer.get_group_id(self.expr_id);
         // if group_id == GroupId(11) {
         //     optimizer.get_all_exprs_in_group(group_id).iter().for_each(|new_expr_id| {

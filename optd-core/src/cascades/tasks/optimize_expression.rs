@@ -42,7 +42,7 @@ impl<T: RelNodeTyp> Task<T> for OptimizeExpressionTask {
 
     fn execute(&self, optimizer: &mut CascadesOptimizer<T>) -> Result<Vec<Box<dyn Task<T>>>> {
         let expr = optimizer.get_expr_memoed(self.expr_id);
-        trace!(event = "task_begin", task = "optimize_expr", expr_id = %self.expr_id, expr = %expr);
+        trace!(event = "task_begin", task = "optimize_expr", expr_id = %self.expr_id, expr = %expr, exploring = %self.exploring);
         let mut tasks = vec![];
         for (rule_id, rule_wrapper) in optimizer.rules().iter().enumerate() {
             let rule = rule_wrapper.rule();

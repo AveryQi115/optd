@@ -7,6 +7,7 @@ use std::{
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use std::any::Any;
+use tracing::trace;
 
 use crate::{
     cost::Cost,
@@ -299,6 +300,7 @@ impl<T: RelNodeTyp> Memo<T> {
 
                 // TODO: instead of remove this expr from the old group,
                 // we mark the expr as all rules have been fired to make it a dead end
+                trace!(event = "apply_rule replace false", expr_id = %expr_id, new_expr_id = %new_expr_id);
                 return false;
             }
 
@@ -306,6 +308,7 @@ impl<T: RelNodeTyp> Memo<T> {
                 .insert(expr_id, memo_node.clone().into());
             self.expr_node_to_expr_id.insert(memo_node.clone(), expr_id);
 
+            trace!(event = "apply_rule replace true", expr_id = %expr_id);
             return true;
         }
         unreachable!("group not found in replace_group_expr");
